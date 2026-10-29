@@ -1,0 +1,13 @@
+---
+import Layout from "@layout/home.layout.astro"
+import Logout from "@component/sections/logout"
+import Background from "@component/global/background"
+import { readAuthSettings } from "../server/auth"
+
+if (readAuthSettings().mode === "local") return Astro.redirect("/")
+Astro.response.headers.set("Cache-Control", "no-store")
+---
+<Layout>
+    <Background client:load />
+    <Logout client:load />
+</Layout>

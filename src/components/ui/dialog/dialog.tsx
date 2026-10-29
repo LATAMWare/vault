@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { type ReactNode, useEffect, useState } from "react"
 
 interface DialogProps {
@@ -11,6 +12,7 @@ interface DialogProps {
     showCloseButton?: boolean
     onClose?: () => void
     onOpenChange?: (open: boolean) => void
+    dismissible?: boolean
 }
 
 const Dialog = (props: DialogProps) => {
@@ -25,7 +27,8 @@ const Dialog = (props: DialogProps) => {
         onOpenChange,
         className = "",
         contentClassName = "",
-        showCloseButton = true
+        showCloseButton = true,
+        dismissible = true
     } = props
 
     const [ isOpen, setIsOpen ] = useState(Boolean(open ?? defaultOpen))
@@ -46,6 +49,7 @@ const Dialog = (props: DialogProps) => {
     }
 
     const handleClose = () => {
+        if (!dismissible) return
         setDialogOpen(false)
     }
 
@@ -64,7 +68,7 @@ const Dialog = (props: DialogProps) => {
         return () => {
             window.removeEventListener("keydown", handleKeyDown)
         }
-    }, [isOpen])
+    }, [isOpen, dismissible])
 
     if (!isOpen) return null
 
@@ -91,7 +95,7 @@ const Dialog = (props: DialogProps) => {
                                     <button
                                         type="button"
                                         className="bg-white/5 border border-white/10 hover:border-white/50 hover:bg-white/10 duration-300 squircle-md px-2 pt-1 pb-0.5 cursor-pointer group absolute right-3.5 top-3.5 text-2xl"
-                                        aria-label="Close"
+                                        aria-label={t("Close")}
                                         onClick={handleClose}
                                     >
                                         <i className="ti ti-x text-white/50 group-hover:text-white duration-300" />

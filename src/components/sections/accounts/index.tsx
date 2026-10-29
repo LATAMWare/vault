@@ -1,8 +1,9 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
-import { getAccounts, getAccountName, getAccountIcon, deleteAccount, checkAccountMasterPassword } from "@logic/account"
+import { getAccounts, getAccountName, getAccountIcon, checkAccountMasterPassword } from "@logic/account"
 import { getStorage, setStorage } from "@logic/storage"
-import { updateSettings, getAccountSettings } from "@logic/settings"
+
 import { showAlert } from "@logic/alert"
 
 import AccountCard from "@component/ui/accounts/account"
@@ -47,7 +48,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
         const currentAccount = getStorage("current-account") || ""
 
         if (currentAccount !== accountId) {
-            showAlert("Only the active account can be edited.", "error", "alert-circle", 3000)
+            showAlert(t("Only the active account can be edited."), "error", "alert-circle", 3000)
             return
         }
 
@@ -63,12 +64,12 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
 
     const handleConfirmSelectAccount = async () => {
         const accountId = pendingAccountId
-        const masterPassword = pendingMasterPassword.trim()
+        const masterPassword = pendingMasterPassword
 
         if (!accountId) return
 
         if (!masterPassword) {
-            showAlert("Please enter your <b>Master Password</b>", "error", "alert-circle", 5000)
+            showAlert(t("Please enter your Master Password"), "error", "alert-circle", 5000)
             return
         }
 
@@ -78,7 +79,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
         })
 
         if (!isValidMasterPassword) {
-            showAlert("Master Password is incorrect for this account", "error", "alert-circle", 5000)
+            showAlert(t("Master Password is incorrect for this account"), "error", "alert-circle", 5000)
             return
         }
 
@@ -112,8 +113,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                         <div className="text-3xl font-inter-black mb-5 flex flex-col md:flex-row">
 
                             <h2>
-                                <i className="ti ti-user-circle mr-2 align-middle inline-block -mt-1.25" /> Accounts
-                            </h2>
+                                <i className="ti ti-user-circle mr-2 align-middle inline-block -mt-1.25" /> {t("Accounts")} </h2>
 
                             <div className="mt-3 md:mt-0 md:ml-5 flex flex-row justify-between gap-2">
                                 <button
@@ -152,7 +152,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                                     onClick={ () => handleCreateAccount() }
                                 >
                                     <i className="ti ti-plus text-8xl mb-2" />
-                                    <span className="text-sm">New Account</span>
+                                    <span className="text-sm">{t("New Account")}</span>
                                 </button>
                             </div>
 
@@ -178,11 +178,12 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                 accountId={ selectedAccount }
                 onUpdate={ handleRefreshAccounts }
                 onClose={ () => setIsEditModalOpen(false) }
+                onPasswordChanged={password => onSelectAccount?.(selectedAccount, password)}
             />
 
             <Dialog
                 open={ isPasswordDialogOpen }
-                title="Unlock Account"
+                title={t("Unlock Account")}
                 onClose={ () => {
                     setIsPasswordDialogOpen(false)
                     setPendingMasterPassword("")
@@ -193,7 +194,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                     <DialogFooter
                         buttons={[
                             {
-                                label: "Cancel",
+                                label: t("Cancel"),
                                 variant: "cancel",
                                 onClick: () => {
                                     setIsPasswordDialogOpen(false)
@@ -202,7 +203,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                                 }
                             },
                             {
-                                label: "Unlock",
+                                label: t("Unlock"),
                                 variant: "success",
                                 position: "end",
                                 onClick: handleConfirmSelectAccount
@@ -212,8 +213,8 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                 }
             >
                 <DialogOption
-                    title="Master Password"
-                    description={`Enter the password for ${getAccountName(pendingAccountId) || "this account"} to switch to it.`}
+                    title={t("Master Password")}
+                    description={t("Enter the password for {{value0}} to switch to it.", { value0: getAccountName(pendingAccountId) || "this account" })}
                     layout="col"
                     className="max-w-100"
                 >
@@ -222,7 +223,7 @@ const Accounts = ({ onSelectAccount }: AccountsProps) => {
                         name="account-master-password"
                         type="password"
                         value={ pendingMasterPassword }
-                        placeholder="Enter your Master Password"
+                        placeholder={t("Enter your Master Password")}
                         onChange={(event: any) => setPendingMasterPassword(event.target.value)}
                         className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md"
                     />

@@ -1,6 +1,6 @@
 import { getStorage, setStorage } from "@logic/storage"
 import { getAlphabetList } from "@logic/alphabet"
-import { normalizeHex, mixWithWhite } from "@logic/utils"
+import { normalizeHex } from "@logic/utils"
 import { applyBackgroundSVG } from "@logic/background"
 
 const DEFAULT_THEME_COLOR = "#a58fff"
@@ -212,6 +212,8 @@ export const getSetting = ({ accountId, settingId }: { accountId: string, settin
 }
 
 export const updateSettings = ({ accountId, settingId, value }: { accountId: string, settingId: string, value: string | number | boolean }) => {
+    if (typeof value === "number" && !Number.isFinite(value)) return false
+    if (settingId === "default-password-length" && (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 1024)) return false
 
     let account = getStorage(accountId)
 
@@ -231,5 +233,6 @@ export const updateSettings = ({ accountId, settingId, value }: { accountId: str
     }
 
     setStorage(accountId, account)
+    return true
     
 }

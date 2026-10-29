@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 interface OpenVaultProps {
     vaultOpened: boolean
 }
@@ -28,7 +29,7 @@ export default function OpenVault(props: OpenVaultProps) {
                 </svg>
             </div>
             <div className="font-inter-bold text-xl md:text-2xl">
-                { vaultOpened ? "Vault Open!" : "Opening vault..." }
+                { vaultOpened ? t("Vault Open!") : t("Opening vault...") }
             </div>
         </div>
     )

@@ -1,5 +1,6 @@
 import { getStorage, setStorage } from "@logic/storage"
 import { generateId } from "@logic/utils"
+import { t } from "@logic/i18n"
 
 export const importVaults = (data: any) => {
     setStorage('vaults', data)
@@ -14,7 +15,7 @@ export const createDefaultVault = (accountId: string) => {
     const defaultVault = [
         {
             id: generateId(),
-            name: 'My Vault',
+            name: t("General"),
             icon: 'vault'
         }
     ]

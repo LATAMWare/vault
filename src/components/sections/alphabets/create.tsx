@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { t } from "@logic/i18n"
+import { useState } from "react"
 
 import { createAlphabet } from "@logic/alphabet"
 import { showAlert } from "@logic/alert"
@@ -45,17 +46,17 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
     const handleSubmit = () => {
 
         if (!form.name.trim()) {
-            showAlert("Please enter a name", "error", "alert-circle", 3000)
+            showAlert(t("Please enter a name"), "error", "alert-circle", 3000)
             return
         }
 
         if (!form.identifier.trim()) {
-            showAlert("Please enter an identifier", "error", "alert-circle", 3000)
+            showAlert(t("Please enter an identifier"), "error", "alert-circle", 3000)
             return
         }
 
         if (!form.characters.trim()) {
-            showAlert("Please enter characters", "error", "alert-circle", 3000)
+            showAlert(t("Please enter characters"), "error", "alert-circle", 3000)
             return
         }
 
@@ -69,11 +70,11 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
                 icon: form.icon
             })
 
-            showAlert("Alphabet created successfully", "success", "check", 5000)
+            showAlert(t("Alphabet created successfully"), "success", "check", 5000)
             handleClose()
             onCreate()
         } catch (error) {
-            showAlert("Failed to create alphabet", "error", "alert-circle", 3000)
+            showAlert(t("Failed to create alphabet"), "error", "alert-circle", 3000)
             console.error(error)
         }
     }
@@ -81,19 +82,19 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
     return (
         <Dialog
             open={open}
-            title="Create New Alphabet"
+            title={t("Create New Alphabet")}
             onClose={handleClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             onClick: handleClose
                         },
                         {
-                            label: "Create",
+                            label: t("Create"),
                             variant: "success",
                             position: "end",
                             onClick: handleSubmit
@@ -103,8 +104,8 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
             }
         >
             <DialogOption
-                title="Alphabet Name"
-                description="Enter a name for this alphabet"
+                title={t("Alphabet Name")}
+                description={t("Enter a name for this alphabet")}
                 layout="row"
             >
                 <Input
@@ -112,7 +113,7 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
                     name="alphabet-name"
                     type="text"
                     value={form.name}
-                    placeholder="My Alphabet"
+                    placeholder={t("My Alphabet")}
                     onChange={(event: any) => {
                         handleChange('name', event.target.value)
                     }}
@@ -121,8 +122,8 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Description"
-                description="Optional description for this alphabet"
+                title={t("Description")}
+                description={t("Optional description for this alphabet")}
                 layout="col"
             >
                 <textarea
@@ -130,7 +131,7 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
                     name="alphabet-description"
                     value={form.description}
                     rows={3}
-                    placeholder="Describe this alphabet"
+                    placeholder={t("Describe this alphabet")}
                     onChange={(event: any) => {
                         handleChange('description', event.target.value)
                     }}
@@ -139,8 +140,8 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Identifier"
-                description="Unique identifier for this alphabet"
+                title={t("Identifier")}
+                description={t("Unique identifier for this alphabet")}
                 layout="row"
             >
                 <Input
@@ -148,7 +149,7 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
                     name="alphabet-identifier"
                     type="text"
                     value={form.identifier}
-                    placeholder="my-alphabet"
+                    placeholder={t("my-alphabet")}
                     onChange={(event: any) => {
                         handleChange('identifier', event.target.value)
                     }}
@@ -157,8 +158,8 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Icon"
-                description="Select an icon for this alphabet"
+                title={t("Icon")}
+                description={t("Select an icon for this alphabet")}
                 layout="row"
             >
                 <IconSelector
@@ -170,8 +171,8 @@ const CreateAlphabetModal = (props: CreateAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Characters"
-                description="The character set for this alphabet"
+                title={t("Characters")}
+                description={t("The character set for this alphabet")}
                 layout="col"
             >
                 <textarea

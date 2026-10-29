@@ -1,12 +1,13 @@
+import { t } from "@logic/i18n"
 import { getStorage, setStorage } from "@logic/storage"
 
 import packageJson from "../../package.json"
 
 export const APP_VERSION = packageJson.version
-export const GITHUB_REPOSITORY = "sizoLabs/vault"
+export const GITHUB_REPOSITORY = "LATAMWare/vault"
 
 const VERSION_CHECK_STORAGE_KEY = "version-check"
-const VERSION_CHECK_INTERVAL = 3 * 1000
+const VERSION_CHECK_INTERVAL = 60 * 60 * 1000
 
 let versionCheckPromise: Promise<VersionCheckCache> | null = null
 
@@ -65,7 +66,7 @@ export const checkForUpdate = async (): Promise<VersionCheckCache> => {
 				headers: { Accept: "application/vnd.github+json" }
 			})
 
-			if (!response.ok) throw new Error(`GitHub responded with ${response.status}`)
+			if (!response.ok) throw new Error(t("GitHub responded with {{value0}}", { value0: response.status }))
 
 			const release = await response.json() as { tag_name?: string }
 			latestVersion = release.tag_name ? normalizeVersion(release.tag_name) : null

@@ -1,9 +1,9 @@
 # Build stage
-FROM node:22.12.0-bookworm-slim AS build
+FROM node:24.15.0-bookworm-slim AS build
 
 WORKDIR /app
 
-RUN npm install --global pnpm@10.6.2
+RUN npm install --global pnpm@10.34.9
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
@@ -14,17 +14,21 @@ COPY . .
 RUN pnpm run build
 
 # Production stage
-FROM node:22.12.0-bookworm-slim AS production
+FROM node:24.15.0-bookworm-slim AS production
 
 WORKDIR /app
 
-RUN npm install --global pnpm@10.6.2
+RUN npm install --global pnpm@10.34.9
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=build /app/dist ./dist
+COPY scripts/company-backup.mjs ./scripts/company-backup.mjs
+COPY scripts/private-env.mjs ./scripts/private-env.mjs
+
+RUN mkdir -p /app/data && chown node:node /app/data
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0

@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 const PAGE_SIZE = 80
@@ -101,7 +102,7 @@ const IconSelector = ({ id, value, onChange, className = "" }: IconSelectorProps
                 const response = await fetch("/libs/tabler-icons.min.css")
 
                 if (!response.ok) {
-                    throw new Error("Unable to fetch icon CSS")
+                    throw new Error(t("Unable to fetch icon CSS"))
                 }
 
                 const cssText = await response.text()
@@ -253,11 +254,11 @@ const IconSelector = ({ id, value, onChange, className = "" }: IconSelectorProps
                     <div className="relative z-999 w-full h-full max-w-200 overflow-hidden rounded-2xl border border-white/10 bg-white/5 lite:bg-darker shadow-2xl shadow-black/30 backdrop-blur-3xl lite:backdrop-blur-none">
 
                         <div className="px-5 py-5 mb-4 flex items-center justify-between gap-3 border-b border-white/10 bg-white/5 pb-3">
-                            <span className="text-sm md:text-lg font-inter-bold text-white">Select an Icon</span>
+                            <span className="text-sm md:text-lg font-inter-bold text-white">{t("Select an Icon")}</span>
                             <button
                                 type="button"
                                 onClick={() => setOpen(false)}
-                                aria-label="Close icon picker"
+                                aria-label={t("Close icon picker")}
                                 className="flex h-8 w-8 cursor-pointer items-center justify-center squircle-md border border-white/10 bg-white/5 text-white/70 hover:border-white/30 hover:bg-white/10"
                             >
                                 <i className="ti ti-x text-lg" />
@@ -272,7 +273,7 @@ const IconSelector = ({ id, value, onChange, className = "" }: IconSelectorProps
                                         type="text"
                                         value={search}
                                         onChange={(event) => setSearch(event.target.value)}
-                                        placeholder="Search icon..."
+                                        placeholder={t("Search icon...")}
                                         className="w-full squircle-md border border-white/15 bg-white/5 py-2.5 pl-10 pr-3 text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
                                     />
                                 </div>
@@ -282,7 +283,7 @@ const IconSelector = ({ id, value, onChange, className = "" }: IconSelectorProps
                                     onClick={handleShowAllToggle}
                                     className={ `w-full md:w-fit cursor-pointer squircle-md border px-6 py-3 text-xs duration-300 ${showAllIcons ? "border-primary bg-primary/20 text-white" : "border-white/15 bg-white/5 lite:bg-darker text-white/80 hover:border-primary/40 hover:bg-primary/10"}` }
                                 >
-                                    {showAllIcons ? "Hide all icons" : "Show all icons"}
+                                    {showAllIcons ? t("Hide all icons") : t("Show all icons")}
                                 </button>
                             </div>
 
@@ -295,7 +296,7 @@ const IconSelector = ({ id, value, onChange, className = "" }: IconSelectorProps
                                             onClick={() => handleCategorySelect(category)}
                                             className={ `cursor-pointer shrink-0 squircle-md border px-3 py-1.5 text-[10px] font-inter-medium uppercase tracking-wide lite:duration-0 duration-300 ${selectedCategory === category ? "border-primary bg-primary/20 text-white" : "border-white/10 bg-white/5 lite:bg-darker text-white/70 hover:border-white/25 hover:bg-white/10 hover:text-white"}` }
                                         >
-                                            {category}
+                                            {t(category)}
                                         </button>
                                     ))}
                                 </div>
@@ -303,9 +304,9 @@ const IconSelector = ({ id, value, onChange, className = "" }: IconSelectorProps
                         </div>
 
                         {allIcons.length === 0 ? (
-                            <div className="py-10 text-center text-white/50">Loading icons...</div>
+                            <div className="py-10 text-center text-white/50">{t("Loading icons...")}</div>
                         ) : filteredIcons.length === 0 ? (
-                            <div className="py-10 text-center text-white/50">No icons found for this category or search.</div>
+                            <div className="py-10 text-center text-white/50">{t("No icons found for this category or search.")}</div>
                         ) : (
                             <div className="flex max-h-[calc(85vh-5rem)] min-h-0 flex-col pb-15 px-5">
                                 <div className="icon-grid-scroll grid min-h-0 max-h-full grid-cols-3 gap-3 overflow-y-auto pr-1 sm:grid-cols-5">

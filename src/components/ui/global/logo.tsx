@@ -1,4 +1,4 @@
-import Version from "@component/sections/settings/version"
+
 
 const Logo = () => {
     return (

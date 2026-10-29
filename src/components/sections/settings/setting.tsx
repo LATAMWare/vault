@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import Toggle from "@component/ui/form/toggle"
 import Select from "@component/ui/form/select"
 import Input from "@component/ui/form/input"
@@ -29,10 +30,10 @@ const Setting = ({ setting, value, accountId, onChange }: SettingProps) => {
         <div className="container" key={ setting.id }>
             <div>
                 <h3>
-                    { setting.name }
+                    { t(setting.name) }
                 </h3>
                 <div className="description">
-                    { setting.description }
+                    { t(setting.description) }
                 </div>
             </div>
             <div className="option">
@@ -42,7 +43,7 @@ const Setting = ({ setting, value, accountId, onChange }: SettingProps) => {
                         id={ setting.id }
                         value={ String(settingValue) }
                         type={ setting.type }
-                        placeholder={ setting.placeholder ?? "" }
+                        placeholder={ setting.placeholder ? t(setting.placeholder) : "" }
                         className="squircle-md w-full md:max-w-60"
                         onChange={ (event: React.ChangeEvent<HTMLInputElement>) => {
                             const nextValue = setting.type === "number" ? parseInt(event.target.value, 10) : event.target.value

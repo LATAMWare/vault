@@ -1,21 +1,19 @@
-import { getStorage, setStorage } from "@logic/storage"
-import { generateId, genServicePassword, copyToClipboard, encodeData, decodeData } from "@logic/utils"
+import { t } from "@logic/i18n"
+import { getStorage, setStorage, mutateAccount } from "@logic/storage"
+import { generateId, genServicePassword, copyToClipboard, encodeData, decodeData, CURRENT_PASSWORD_ALGORITHM } from "@logic/utils"
 import { showAlert } from "@logic/alert"
 import { type IService } from "@interface/index"
+import { validateService } from "@logic/validation"
+import { assertAccountPassword } from "@logic/master"
 import { getAlphabetList } from "@logic/alphabet"
 import { getAccountName, getAccountIcon } from "@logic/account"
 
 export const getServiceDescription = async (data: string, masterPassword: string) => {
     if (!data || typeof data !== 'string' || data.trim() === '') return ""
-    try {
-        return await decodeData(masterPassword, data)
-    } catch (error) {
-        console.error('Error decoding service description:', error)
-        return ""
-    }
+    return decodeData(masterPassword, data)
 }
 
-export const sendChromeExtensionCommand = ({ type, payload = {} }: { type: string, payload?: Record<string, any> }): Promise<boolean> => {
+export const sendChromeExtensionCommand = ({ type, payload = {}, requiredCapabilities = [] }: { type: string, payload?: Record<string, any>, requiredCapabilities?: string[] }): Promise<boolean> => {
     if (typeof window === "undefined") return Promise.resolve(false)
 
     return new Promise((resolve) => {
@@ -28,12 +26,14 @@ export const sendChromeExtensionCommand = ({ type, payload = {} }: { type: strin
 
         const responseHandler = (event: MessageEvent) => {
             if (
+                event.source === window && event.origin === window.location.origin &&
                 event.data?.source === 'vault-extension-response' &&
                 event.data?.requestId === requestId
             ) {
                 clearTimeout(timeout)
                 window.removeEventListener('message', responseHandler)
-                resolve(event.data?.success === true)
+                const capabilities = Array.isArray(event.data?.capabilities) ? event.data.capabilities : []
+                resolve(event.data?.success === true && requiredCapabilities.every(capability => capabilities.includes(capability)))
             }
         }
 
@@ -46,7 +46,7 @@ export const sendChromeExtensionCommand = ({ type, payload = {} }: { type: strin
             requestId
         }
 
-        window.postMessage(detail, "*")
+        window.postMessage(detail, window.location.origin)
     })
 }
 
@@ -65,16 +65,24 @@ export const clearChromeExtensionData = async (): Promise<boolean> => await send
     payload: {}
 })
 
-export const syncServicesWithChromeExtension = ({ accountId }: { accountId?: string } = {}) => {
+export const syncServicesWithChromeExtension = async ({ accountId }: { accountId?: string } = {}) => {
 
     const resolvedAccountId = accountId || getStorage("current-account")
     const currentAccount = resolvedAccountId ? getStorage(resolvedAccountId) : null
 
     if (!currentAccount || typeof window === "undefined") {
-        return showAlert("Failed to sync services with Chrome extension", "error", "x", 2500)
+        return showAlert(t("Failed to sync services with Chrome extension"), "error", "x", 2500)
     }
 
     const services = Array.isArray(currentAccount.services) ? currentAccount.services : []
+    const requiredCapabilities: string[] = []
+    if (services.some((service: IService) => service.algorithm === "pbkdf2-v2")) requiredCapabilities.push("pbkdf2-v2")
+    if (services.some((service: IService) => service.password)) requiredCapabilities.push("encrypted-service-passwords")
+    if (currentAccount.master?.iterations) requiredCapabilities.push("master-verifier-iterations")
+    if (requiredCapabilities.length && !await sendChromeExtensionCommand({ type: "GET_CAPABILITIES", requiredCapabilities })) {
+        showAlert(t("This extension does not support the current vault format. Update the extension before syncing this account."), "error", "alert-circle", 5000)
+        return false
+    }
     const alphabets = Array.isArray(currentAccount.alphabets) ? currentAccount.alphabets : []
     const info = {
         id: resolvedAccountId,
@@ -93,8 +101,8 @@ export const syncServicesWithChromeExtension = ({ accountId }: { accountId?: str
         }
     }
 
-    window.postMessage(detail, "*")
-    showAlert("Vault synchronized with extension!", "success", "check", 2500)
+    window.postMessage(detail, window.location.origin)
+    showAlert(t("Vault data sent to the compatible extension"), "success", "check", 2500)
     return true
 
 }
@@ -172,7 +180,7 @@ export const reorderService = ({ accountId, vaultId, serviceId, direction }: { a
         if (service.vault === vaultId) indexes.push(index)
         return indexes
     }, [])
-    const currentVaultIndex = vaultServiceIndexes.findIndex((index) => services[index].id === serviceId)
+    const currentVaultIndex = vaultServiceIndexes.findIndex((index: number) => services[index].id === serviceId)
     const targetVaultIndex = currentVaultIndex + direction
 
     if (currentVaultIndex < 0 || targetVaultIndex < 0 || targetVaultIndex >= vaultServiceIndexes.length) return
@@ -184,117 +192,42 @@ export const reorderService = ({ accountId, vaultId, serviceId, direction }: { a
     setStorage(accountId, { ...account, services })
 }
 
-export const createService = async ({
-    accountId,
-    name,
-    vaultId,
-    description,
-    url,
-    icon,
-    identifier,
-    alphabet,
-    length,
-    masterPassword
-}: {
-    accountId: string,
-    vaultId: string,
-    name: string,
-    description: string,
-    url: string,
-    icon: string,
-    identifier: string,
-    alphabet: string,
-    length: number,
-    masterPassword: string
-}) => {
-
-    let account = getStorage(accountId)
-    let services = account.services
-
-    if(!services) services = [] as IService[]
-
-    const encryptedDescription = description ? await encodeData(masterPassword, description) : ""
-
-    const newService: IService = {
-        id: generateId(),
-        name: name,
-        icon: icon,
-        description: encryptedDescription,
-        url: url,
-        identifier: identifier,
-        alphabet: alphabet,
-        length: length,
-        vault: vaultId,
-        version: 1
-    }
-
-    services.push(newService)
-
-    account = {
-        ...account,
-        services: services
-    }
-
-    setStorage(accountId, account)
-    
+export const getServicePassword = async (masterPassword: string, service: IService, alphabet: { identifier: string, characters: string }) => {
+    if (service.password) return decodeData(masterPassword, service.password)
+    return genServicePassword(masterPassword, service.identifier, service.length, alphabet, service.version ?? 1, service.algorithm ?? "legacy")
 }
 
-export const updateService = async ({
-    accountId,
-    serviceId,
-    vaultId,
-    name,
-    description,
-    icon,
-    url,
-    identifier,
-    alphabet,
-    length,
-    version,
-    masterPassword
-}: {
-    accountId: string,
-    serviceId: string,
-    vaultId: string,
-    name: string,
-    description: string,
-    icon: string,
-    url: string,
-    identifier: string,
-    alphabet: string,
-    length: number,
-    version: number,
-    masterPassword: string
-}) => {
-
-    let account = getStorage(accountId)
-    let services = account.services
-
-    const encryptedDescription = description ? await encodeData(masterPassword, description) : ""
-
-    for (let index = 0; index < services.length; index++) {
-        if(services[index].id === serviceId) {
-            services[index].name = name
-            services[index].description = encryptedDescription
-            services[index].icon = icon
-            services[index].url = url
-            services[index].identifier = identifier
-            services[index].alphabet = alphabet
-            services[index].length = length
-            services[index].vault = vaultId
-            services[index].version = version
-            break
-        }
+export const createService = async (input: {
+    accountId: string, vaultId: string, name: string, description: string, url: string, icon: string,
+    identifier: string, alphabet: string, length: number, masterPassword: string
+}) => mutateAccount(input.accountId, async (account) => {
+    await assertAccountPassword(input.accountId, input.masterPassword)
+    const service: IService = {
+        id: generateId(), name: input.name, icon: input.icon, description: "", url: input.url,
+        identifier: input.identifier, alphabet: input.alphabet, length: input.length, vault: input.vaultId,
+        version: 1, algorithm: CURRENT_PASSWORD_ALGORITHM
     }
+    validateService(service, account)
+    service.description = input.description ? await encodeData(input.masterPassword, input.description) : ""
+    return { account: { ...account, services: [...(account.services ?? []), service] }, result: service.id }
+})
 
-    account = {
-        ...account,
-        services: services
+export const updateService = async (input: {
+    accountId: string, serviceId: string, vaultId: string, name: string, description: string, icon: string,
+    url: string, identifier: string, alphabet: string, length: number, version: number, masterPassword: string
+}) => mutateAccount(input.accountId, async (account) => {
+    await assertAccountPassword(input.accountId, input.masterPassword)
+    const original = account.services?.find((service: IService) => service.id === input.serviceId)
+    if (!original) throw new Error(t("Service no longer exists"))
+    const next: IService = {
+        ...original, name: input.name, icon: input.icon, url: input.url, identifier: input.identifier,
+        alphabet: input.alphabet, length: input.length, version: input.version, vault: input.vaultId,
+        description: input.description ? await encodeData(input.masterPassword, input.description) : ""
     }
-
-    setStorage(accountId, account)
-    
-}
+    validateService(next, account)
+    if (original.identifier !== next.identifier || original.alphabet !== next.alphabet || original.length !== next.length || (original.version ?? 1) !== next.version) { delete next.password; next.algorithm = CURRENT_PASSWORD_ALGORITHM }
+    return { account: { ...account, services: account.services.map((service: IService) => service.id === next.id ? next : service) }, result: undefined }
+})
 
 export const deleteService = ({ accountId, serviceId }: { accountId: string, serviceId: string }) => {
 
@@ -333,19 +266,21 @@ export const copyServicePasswordToClipboard = async ({
         const service = getService({ accountId, serviceId })
         const alphabets = getAlphabetList(accountId)
         const alphabetData = alphabets.find((a: any) => a.id === service.alphabet)
-        const password = await genServicePassword(masterPassword, service.identifier, service.length, alphabetData, service.version)
+        const password = await getServicePassword(masterPassword, service, alphabetData)
 
-        copyToClipboard(password)
+        await copyToClipboard(password)
         
         showAlert(
-            `<b>${ service.name === "" ? "Service" : service.name }</b> password copied to clipboard!`,
+            t("{{value0}} password copied to clipboard!", { value0: service.name === "" ? t("Service") : service.name }),
             'success',
             'check', 
             3000
         )
+        return true
 
     } catch (error) {
-        showAlert('Error copying password', 'error', 'alert-circle', 3000)
+        showAlert(t("Error copying password"), 'error', 'alert-circle', 3000)
+        return false
         
     }
 

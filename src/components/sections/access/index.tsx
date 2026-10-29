@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState, useRef } from "react"
 
 import { showAlert } from "@logic/alert"
@@ -15,8 +16,6 @@ import {
 
 import Logo from "@component/ui/global/logo"
 import OpenAnimation from "@component/sections/access/open-animation"
-import Footer from "@component/global/footer"
-import Lite from "@component/global/lite"
 import Version from "@component/sections/settings/version"
 
 interface AccessProps {
@@ -29,11 +28,11 @@ interface AccessProps {
 
 const Access = (props: AccessProps) => {
 
-    const { onSubmitForm, onSectionChange } = props
+    const { onSubmitForm } = props
 
     const dropdownRef = useRef<HTMLDivElement | null>(null)
 
-    const [ accountName, setAccountName ] = useState("Personal Account")
+    const [ accountName, setAccountName ] = useState("")
     const [ accounts, setAccounts ] = useState<string[]>([])
     const [ selectedAccount, setSelectedAccount ] = useState<string | 'new'>('new')
     const [ dropdownOpen, setDropdownOpen ] = useState(false)
@@ -50,22 +49,24 @@ const Access = (props: AccessProps) => {
 
         event.preventDefault()
 
+        if (isOpeningVault) return
         const password = event.target.password.value
 
         if(password === '') return showAlert(
-            'Please enter your <b>Master Password</b>',
+            t("Please enter your Master Password"),
             'error',
             'exclamation-circle',
             5000
         )
 
         const newAccountName = selectedAccount === 'new'
-            ? accountName.trim() || 'Personal Account'
+            ? accountName.trim() || t('Personal Account')
             : getAccountName(selectedAccount)
 
         setAccountName(newAccountName)
 
         const proceed = async () => {
+            setIsOpeningVault(true)
 
             if (!accounts || accounts.length === 0 || selectedAccount === 'new') {
 
@@ -114,7 +115,7 @@ const Access = (props: AccessProps) => {
                 setIsOpeningVault(false)
 
                 return showAlert(
-                    'Master Password is incorrect for this account',
+                    t("Master Password is incorrect for this account"),
                     'error',
                     'exclamation-circle',
                     5000
@@ -153,7 +154,10 @@ const Access = (props: AccessProps) => {
 
         }
 
-        proceed()
+        proceed().catch((error: unknown) => {
+            setIsOpeningVault(false)
+            showAlert(error instanceof Error ? error.message : t("Could not unlock the account"), "error", "exclamation-circle", 5000)
+        })
 
     }
 
@@ -214,20 +218,18 @@ const Access = (props: AccessProps) => {
             <div className="absolute inset-0 overflow-y-scroll no-scrollbar-but-scroll">
 
                 <div className="z-50 mx-auto flex min-h-full w-full max-w-full flex-col items-center justify-center p-5 md:max-w-300">
-
-                    <Lite />
                     
                     <Logo />
 
-                    <div className="text-2xl md:text-4xl text-center mb-2">
-                        The world's <b className="font-inter-black">most secure</b> Password Manager
-                    </div>
-
-                    <div className="text-xl md:text-[26px] text-center text-white/60 mb-15">
-                        Serverless, self-hosted, open source and <b className="text-primary">free forever</b>.
+                    <div className="text-2xl md:text-4xl text-center mb-10"> {t("Local password manager for")} <b className="font-inter-black">LATAMWare</b>
                     </div>
 
                     <div className="flex flex-col gap-10 max-w-95">
+
+                        <div className="text-center">
+                            <h1 className="text-xl font-inter-bold">{selectedAccount === 'new' ? t("Create local account") : t("Unlock local account")}</h1>
+                            <p className="mt-2 text-sm text-white/65">{t("A local account groups your vaults under one master password. Vaults are folders for services and secrets.")}</p>
+                        </div>
                         
                         <form
                             onSubmit={ handleSubmit }
@@ -246,7 +248,7 @@ const Access = (props: AccessProps) => {
                                         <span className="flex min-w-0 items-center gap-2 text-left">
                                             <i className={`ti ti-${selectedAccountIcon} text-xl`} />
                                             <span className="truncate">
-                                                { selectedAccount === 'new' ? 'Create new account' : getAccountName(selectedAccount) }
+                                                { selectedAccount === 'new' ? t("Create local account") : getAccountName(selectedAccount) }
                                             </span>
                                         </span>
                                         <i className={`ti ${dropdownOpen ? 'ti-chevron-up' : 'ti-chevron-down'} ml-2`} />
@@ -258,16 +260,14 @@ const Access = (props: AccessProps) => {
                                                 key="new"
                                                 onClick={() => {
                                                     setSelectedAccount('new')
-                                                    setAccountName('Personal Account')
+                                                    setAccountName('')
                                                     setDropdownOpen(false)
                                                 }}
                                                 className="px-5 py-3 cursor-pointer hover:bg-white/10 border-b border-white/10 last:border-transparent lite:bg-darker lite:hover:bg-darker lite:hover:text-primary"
                                             >
                                                 <div className="flex items-center justify-center gap-2">
                                                     <i className="ti ti-user-plus text-lg" />
-                                                    <span className="font-inter-medium text-lg">
-                                                        Create New Account
-                                                    </span>
+                                                    <span className="font-inter-medium text-lg"> {t("Create local account")} </span>
                                                 </div>
                                             </li>
 
@@ -321,7 +321,7 @@ const Access = (props: AccessProps) => {
 
                             { (!accounts || accounts.length === 0 || selectedAccount === 'new') && (
                                 <input
-                                    placeholder="Account Name"
+                                    placeholder={t("Local account name")}
                                     type="text"
                                     name="account-name"
                                     value={accountName}
@@ -331,7 +331,7 @@ const Access = (props: AccessProps) => {
                             )}
 
                             <input
-                                placeholder="Enter your Master Password"
+                                placeholder={t("Enter your Master Password")}
                                 type="password"
                                 name="password"
                                 value={masterPassword}
@@ -344,18 +344,15 @@ const Access = (props: AccessProps) => {
                                 disabled={isOpeningVault}
                                 className={`text-md md:text-xl h-fit w-full squircle-md px-5 py-4 border cursor-pointer duration-300 transition bg-primary/10 border-primary/60 hover:bg-primary/30 hover:to-primary/30 hover:border-primary hover:text-white text-white/60 text-center font-inter-black ${isOpeningVault ? 'pointer-events-none opacity-60' : ''}`}
                             >
-                                {isOpeningVault ? selectedAccount === 'new' ? 'Creating...' : 'Unlocking...' : (accounts && accounts.length > 0 && selectedAccount !== 'new' ? 'Unlock Account' : 'Create Account')}
+                                {isOpeningVault ? selectedAccount === 'new' ? t("Creating...") : t("Unlocking...") : (accounts && accounts.length > 0 && selectedAccount !== 'new' ? t("Unlock local account") : t("Create local account"))}
                             </button>
 
                             { shouldShowMasterSeedBlocks && (
                                 <div className="flex flex-col gap-3 p-4 text-left max-w-full bg-white/2 border-white/10 border squircle-md">
                                     <div>
                                         <h3 className="font-inter-bold text-lg">
-                                            <i className="ti ti-square-f0 mr-0.5 align-middle inline-block -mt-0.5" /> Master Password Tokens
-                                        </h3>
-                                        <div className="text-xs text-white/60">
-                                            Here you can check if the tokens are correct.
-                                            { selectedAccount === 'new' && " Remember them when you create your account." }
+                                            <i className="ti ti-square-f0 mr-0.5 align-middle inline-block -mt-0.5" /> {t("Password verification tokens")} </h3>
+                                        <div className="text-xs text-white/60"> {t("Use these tokens to recognize your master password. They cannot recover it.")}
                                         </div>
                                     </div>
 
@@ -370,9 +367,7 @@ const Access = (props: AccessProps) => {
                                                 <span className="block h-5 w-5 squircle-full" style={{ backgroundColor: `rgba(${block.color.r}, ${block.color.g}, ${block.color.b}, 1)` }}></span>
                                             </div>
                                         )) : (
-                                            <div className="col-span-2 text-sm text-white/50 md:col-span-4">
-                                                Enter your Master Password to view the tokens.
-                                            </div>
+                                            <div className="col-span-2 text-sm text-white/50 md:col-span-4"> {t("Enter your Master Password to view the tokens.")} </div>
                                         ) }
                                     </div>
                                 </div>
@@ -384,8 +379,6 @@ const Access = (props: AccessProps) => {
                 </div>
 
             </div>
-
-            <Footer onSectionChange={ onSectionChange } />
 
             { showAnimations && isOpeningVault && (
                 <OpenAnimation vaultOpened={vaultOpened} />

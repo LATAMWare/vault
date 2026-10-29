@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useMemo, useState } from "react"
 
 import { copySecretToClipboard } from "@logic/secret"
@@ -96,20 +97,22 @@ export default function Search({ account, accountId, masterPassword, isOpen, onO
 
         const resultKey = `${result.type}-${result.id}`
 
+        let copied = false
         if (result.type === "service") {
-            await copyServicePasswordToClipboard({
+            copied = await copyServicePasswordToClipboard({
                 accountId,
                 masterPassword,
                 serviceId: result.itemId
             })
         } else {
-            await copySecretToClipboard({
+            copied = await copySecretToClipboard({
                 accountId,
                 masterPassword,
                 secretId: result.itemId
             })
         }
 
+        if (!copied) return
         setCopiedResultId(resultKey)
 
         setTimeout(() => {
@@ -142,12 +145,12 @@ export default function Search({ account, accountId, masterPassword, isOpen, onO
                             <div className="mb-4 flex items-center justify-between gap-3 px-5 pt-5 border-b border-white/10 pb-4">
                                 <div className="flex items-center gap-2 text-lg md:text-2xl font-inter-black">
                                     <i className="ti ti-search" />
-                                    <span>Search</span>
+                                    <span>{t("Search")}</span>
                                 </div>
 
                                 <button
                                     type="button"
-                                    aria-label="Close search"
+                                    aria-label={t("Close search")}
                                     className="flex h-9 w-9 items-center justify-center squircle-md border border-white/10 bg-white/5 text-white/60 duration-300 hover:border-white/30 hover:bg-white/10 hover:text-white cursor-pointer"
                                     onClick={closeSearch}
                                 >
@@ -164,14 +167,14 @@ export default function Search({ account, accountId, masterPassword, isOpen, onO
                                         type="text"
                                         value={searchQuery}
                                         onChange={(event) => setSearchQuery(event.target.value)}
-                                        placeholder="Search for services or secrets..."
+                                        placeholder={t("Search for services or secrets...")}
                                         className="w-full bg-transparent text-base text-white placeholder:text-white/40 outline-none"
                                     />
                                 </div>
 
                                 {!searchResults.length ? (
                                     <div className="squircle-md border border-white/10 bg-white/2 px-4 py-6 text-center text-sm text-white/50">
-                                        {searchQuery ? "No results found" : "Type to search for services or secrets"}
+                                        {searchQuery ? t("No results found") : t("Type to search for services or secrets")}
                                     </div>
                                 ) : (
                                     <div className="flex max-h-[60vh] flex-col gap-2 overflow-auto no-scrollbar-but-scroll pr-1">
@@ -198,7 +201,7 @@ export default function Search({ account, accountId, masterPassword, isOpen, onO
                                                             {result.name}
                                                         </div>
                                                         <div className="text-xs text-white/55">
-                                                            {result.type === "service" ? "Service" : "Secret"} · {result.vaultName}
+                                                            {result.type === "service" ? t("Service") : t("Secret")} · {result.vaultName}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -206,7 +209,7 @@ export default function Search({ account, accountId, masterPassword, isOpen, onO
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         type="button"
-                                                        aria-label={`Open ${result.name}`}
+                                                        aria-label={t("Open {{value0}}", { value0: result.name })}
                                                         className="flex h-9 w-9 items-center justify-center squircle-md border border-white/10 bg-white/5 text-white/60 duration-300 hover:border-white/30 hover:bg-white/10 hover:text-white cursor-pointer"
                                                         onClick={(event) => {
                                                             event.stopPropagation()

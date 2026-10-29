@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useRef, useState } from "react"
 
 interface SelectProps {
@@ -41,7 +42,7 @@ const Select = (props: SelectProps) => {
                 className="font-inter-medium h-fit w-full squircle-md px-3 py-2.5 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white flex justify-between items-center cursor-pointer lite:bg-darker"
             >
                 <span className="truncate">
-                    { selectedOption ? selectedOption.name : "Select an option" }
+                    { selectedOption ? selectedOption.name : t("Select an option") }
                 </span>
                 <i className={`ti ${dropdownOpen ? "ti-chevron-up" : "ti-chevron-down"} ml-2`} />
             </button>

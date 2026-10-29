@@ -1,8 +1,10 @@
-import { useState } from "react"
+import { t } from "@logic/i18n"
+
 
 import SidebarLogo from "@component/ui/sidebar/logo"
 import SidebarButton from "@component/ui/sidebar/button"
 import SidebarUfo from "@component/ui/sidebar/ufo"
+import LanguageSelector from "./language-selector"
 
 interface MobileMenuProps {
     isOpen: boolean
@@ -62,6 +64,7 @@ export default function MobileMenu({
                         <button
                             type="button"
                             onClick={onClose}
+                            aria-label={t("Close menu")}
                             className="flex items-center justify-center p-2 border border-white/10 bg-white/2 hover:bg-white/10 squircle-md transition-colors duration-200 cursor-pointer"
                         >
                             <i className="ti ti-x text-xl text-white" />
@@ -69,7 +72,7 @@ export default function MobileMenu({
 
                     </div>
 
-                    <div className="relative flex h-full flex-col min-h-0">
+                    <div className="relative flex min-h-0 flex-1 flex-col min-h-0">
                         <div className="flex-1 min-h-0 overflow-auto no-scrollbar-but-scroll mask-to-bottom mask-fade-20 px-2 py-2 pb-10">
                             <div className="flex flex-col gap-1 w-full">
 
@@ -77,7 +80,7 @@ export default function MobileMenu({
 
                                     <SidebarButton
                                         icon="ti-vault"
-                                        label="My Vault"
+                                        label={t("My Vault")}
                                         active={activePanel === "vault"}
                                         show={accountId ? false : true}
                                         onClick={() => handlePanelChange("home")}
@@ -108,11 +111,12 @@ export default function MobileMenu({
                         </div>
 
                         <div className="w-full pt-2 pb-2 px-2">
+                            <LanguageSelector />
                             <div className="w-full flex flex-col items-left justify-left gap-1">
 
                                 <SidebarButton
                                     icon="ti-question-mark"
-                                    label="FAQs"
+                                    label={t("FAQs")}
                                     active={activePanel === "faq"}
                                     show={true}
                                     onClick={() => handlePanelChange("faq")}
@@ -120,7 +124,7 @@ export default function MobileMenu({
 
                                 <SidebarButton
                                     icon="ti ti-vault"
-                                    label="New Vault"
+                                    label={t("New Vault")}
                                     active={false}
                                     show={accountId ? true : false}
                                     onClick={() => {
@@ -131,7 +135,7 @@ export default function MobileMenu({
 
                                 <SidebarButton
                                     icon="ti-abc"
-                                    label="Alphabets"
+                                    label={t("Alphabets")}
                                     active={activePanel === "alphabets"}
                                     show={accountId ? true : false}
                                     onClick={() => handlePanelChange("alphabets")}
@@ -139,7 +143,7 @@ export default function MobileMenu({
 
                                 <SidebarButton
                                     icon="ti-user"
-                                    label="Accounts"
+                                    label={t("Accounts")}
                                     active={activePanel === "accounts"}
                                     show={accountId ? true : false}
                                     onClick={() => handlePanelChange("accounts")}
@@ -147,7 +151,7 @@ export default function MobileMenu({
 
                                 <SidebarButton
                                     icon="ti-settings"
-                                    label="Settings"
+                                    label={t("Settings")}
                                     active={activePanel === "settings"}
                                     show={accountId ? true : false}
                                     onClick={() => handlePanelChange("settings")}

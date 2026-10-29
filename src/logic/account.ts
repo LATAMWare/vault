@@ -1,13 +1,16 @@
-import { getStorage, setStorage, removeStorage } from "@logic/storage"
+import { t } from "@logic/i18n"
+import { getStorage, setStorage, removeStorage, mutateAccount, clearAccountSession } from "@logic/storage"
 
-import { deleteChromeExtensionAccount } from "@logic/service"
+import { deleteChromeExtensionAccount, getServicePassword } from "@logic/service"
 import { generateAccountId } from "@logic/utils"
-import { setMasterVerifier, verifyMasterPassword, removeMasterVerifier } from "@logic/master"
+import { setMasterVerifier, verifyMasterPassword, removeMasterVerifier, createMasterVerifier } from "@logic/master"
 
 import { createDefaultAlphabet } from "@logic/alphabet"
 import { createDefaultVault } from "@logic/vault"
 import { createDefaultSettings } from "@logic/settings"
 import { encodeData, decodeData, downloadFile } from "@logic/utils"
+import { validateAccountData } from "@logic/validation"
+import { announceMasterPasswordChange } from "@logic/session"
 import { showAlert } from "@logic/alert"
 
 export const importAccount = (data: any) => {
@@ -104,6 +107,7 @@ export const deleteAccount = (id: string) => {
         setStorage("current-account", "")
     }
 
+    clearAccountSession(id)
     removeStorage(id)
     
     setStorage("accounts", accounts)
@@ -121,150 +125,67 @@ export const exportAccountData = async ({
     const account = getStorage(accountId)
     const exportPayload = account && typeof account === "object" ? { ...account } : {}
     delete exportPayload.drive
+    delete exportPayload.session
 
     const encodedData = await encodeData(masterPassword, JSON.stringify(exportPayload))
     downloadFile(encodedData, getExportFileName(accountId), "application/octet-stream")
-    showAlert("Data exported successfully!", "success", "database-export", 5000)
+    showAlert(t("Data exported successfully!"), "success", "database-export", 5000)
 }
 
-const sanitizeImportedAccountData = (accountId: string, data: any) => {
-    const accountData = data && typeof data === 'object' ? data : {}
-    const settings = Array.isArray(accountData.settings) ? accountData.settings : []
-    const persistSetting = settings.find((setting: { id?: string }) => setting?.id === "store-master-verifier")
-
-    if (persistSetting && persistSetting.value === false) {
-        delete accountData.master
-    } else if (!persistSetting && !accountData.master) {
-        return accountData
-    } else if (!persistSetting && accountData.master) {
-        delete accountData.master
-    }
-
-    return accountData
+const reencrypt = async (value: string, oldPassword: string, newPassword: string) => {
+    if (!value) return ""
+    const plaintext = await decodeData(oldPassword, value)
+    return oldPassword === newPassword && value.startsWith("vault:v2:") ? value : encodeData(newPassword, plaintext)
 }
 
-export const importAccountData = ({
-    accountId,
-    masterPassword,
-    event,
-    onImportComplete
-}: {
-    accountId: string,
-    masterPassword: string,
-    event: any,
-    onImportComplete: () => void
-}) => {
-
-    const file = event?.target?.files?.[0]
-
-    if (!file) {
-        showAlert("No file was selected", "error", "exclamation-circle", 5000)
-        return
+export const prepareImportedAccount = async (data: unknown, masterPassword: string) => {
+    const account: any = validateAccountData(data)
+    for (const secret of account.secrets) {
+        secret.content = await reencrypt(secret.content, masterPassword, masterPassword)
+        secret.description = await reencrypt(secret.description, masterPassword, masterPassword)
     }
-
-    const fileFormat = detectImportFileFormat(file)
-
-    if (!fileFormat) {
-        showAlert("Unsupported file format. Use .vault", "error", "exclamation-circle", 5000)
-        return
+    for (const service of account.services) {
+        service.description = await reencrypt(service.description, masterPassword, masterPassword)
+        if (service.password) service.password = await reencrypt(service.password, masterPassword, masterPassword)
     }
+    if (!account.settings.some((setting: any) => setting.id === "store-master-verifier" && setting.value === false)) account.master = await createMasterVerifier(masterPassword)
+    return account
+}
 
-    const reader = new FileReader()
-
-    reader.readAsText(file)
-    reader.onload = async () => {
-
-        try {
-
-            const data = reader.result as string
-            const decodedData = await decodeData(masterPassword, data)
-            const parsedData = sanitizeImportedAccountData(accountId, JSON.parse(decodedData))
-
-            let account = getStorage(accountId)
-
-            if(fileFormat === "ovni") {
-
-                const normalData = normalizeFields(parsedData)
-                const importedAlphabets = Array.isArray(normalData.alphabets) ? normalData.alphabets : []
-
-                const defaultSettings = [
-                    {
-                        id: "account-name",
-                        value: account.settings[0].value
-                    },
-                    {
-                        id: "account-icon",
-                        value: "user"
-                    },
-                    {
-                        id: "default-password-length",
-                        value: 14
-                    },
-                    {
-                        id: "default-alphabet",
-                        value: importedAlphabets[0].id
-                    },
-                    {
-                        id: "show-passwords",
-                        value: false
-                    },
-                    {
-                        id: "show-animations",
-                        value: true
-                    },
-                    {
-                        id: "theme-color",
-                        value: "#a58fff"
-                    },
-                    {
-                        id: "disable-gradient-background",
-                        value: false
-                    },
-                    {
-                        id: "disable-colored-background",
-                        value: false
-                    }
-                ]
-
-                account = {
-                    settings: defaultSettings,
-                    alphabets: importedAlphabets,
-                    vaults: normalData.vaults,
-                    services: normalData.services
-                }
-
-                setStorage(accountId, account)
-
-                setAccountMasterPassword({
-                    accountId,
-                    masterPassword
-                })
-
-            } else {
-                setStorage(accountId, parsedData)
-            }
-
-            if (parsedData && typeof parsedData === "object") {
-                const parsedSettings = Array.isArray(parsedData.settings) ? parsedData.settings : []
-                const storeMasterSetting = parsedSettings.find((setting: { id?: string }) => setting?.id === "store-master-verifier")
-
-                if (storeMasterSetting && storeMasterSetting.value === false) {
-                    delete parsedData.master
-                    setStorage(accountId, parsedData)
-                }
-            }
-
-            onImportComplete()
-
-            showAlert("Data imported to your account!", "success", "database-import", 5000)
-
-        } catch(e) {
-            showAlert("Master Password does not match", "error", "exclamation-circle", 5000)
-            console.error("Error importing account data:", e)
+export const restoreAccountData = async (accountId: string, masterPassword: string, encryptedData: string, legacy = false) => {
+    await mutateAccount(accountId, async (current) => {
+        let data = JSON.parse(await decodeData(masterPassword, encryptedData))
+        if (legacy) {
+            data = normalizeFields(data)
+            data.settings = current.settings.map((setting: any) => setting.id === "default-alphabet" ? { ...setting, value: data.alphabets?.[0]?.id ?? "" } : setting)
         }
+        const account = await prepareImportedAccount(data, masterPassword)
+        // Restoring a backup cannot silently change which sessions are authorized.
+        account.session = current.session
+        return { account, result: undefined }
+    })
+}
 
+export const importAccountData = ({ accountId, masterPassword, event, onImportComplete }: {
+    accountId: string, masterPassword: string, event: any, onImportComplete: () => void
+}) => {
+    const file = event?.target?.files?.[0]
+    if (!file) { showAlert(t("No file was selected"), "error", "exclamation-circle", 5000); return }
+    const format = detectImportFileFormat(file)
+    if (!format) { showAlert(t("Unsupported file format. Use .vault or .ovni"), "error", "exclamation-circle", 5000); return }
+    if (file.size > 32 * 1024 * 1024) { showAlert(t("Backup exceeds the 32 MiB import limit"), "error", "exclamation-circle", 5000); return }
+    const reader = new FileReader()
+    reader.onload = async () => {
+        try {
+            await restoreAccountData(accountId, masterPassword, String(reader.result), format === "ovni")
+            onImportComplete()
+            showAlert(t("Data imported to your account!"), "success", "database-import", 5000)
+        } catch {
+            showAlert(t("Could not import this backup. Check the master password and file integrity. Existing data was kept."), "error", "exclamation-circle", 5000)
+        }
     }
-    
+    reader.onerror = () => showAlert(t("Could not read the backup file"), "error", "exclamation-circle", 5000)
+    reader.readAsText(file)
 }
 
 export const setAccountMasterPassword = async ({
@@ -296,23 +217,37 @@ export const checkAccountMasterPassword = async ({
         return await verifyMasterPassword({ accountId, masterPassword })
 }
 
-export const changeMasterPassword = async ({
-    accountId,
-    newMasterPassword
-}: {
-    accountId: string,
-    newMasterPassword: string
+export const changeMasterPassword = async ({ accountId, currentMasterPassword, newMasterPassword, closeOtherSessions = true }: {
+    accountId: string, currentMasterPassword: string, newMasterPassword: string, closeOtherSessions?: boolean
 }) => {
-    if (!newMasterPassword || newMasterPassword.trim() === "") {
-        showAlert("Master password cannot be empty", "error", "exclamation-circle", 5000)
+    if (!currentMasterPassword || !newMasterPassword.trim() || currentMasterPassword === newMasterPassword) {
+        showAlert(t("Enter the current password and a different, non-empty new password"), "error", "exclamation-circle", 5000)
         return false
     }
     try {
-        await setMasterVerifier({ accountId, masterPassword: newMasterPassword })
-        showAlert("Master password changed successfully!", "success", "key", 5000)
+        const handoff = !closeOtherSessions ? await encodeData(currentMasterPassword, newMasterPassword) : undefined
+        const session = { revision: generateAccountId(), revokePrevious: closeOtherSessions }
+        await mutateAccount(accountId, async (current) => {
+            if (!await verifyMasterPassword({ accountId, masterPassword: currentMasterPassword })) throw new Error(t("Incorrect current password"))
+            const account: any = validateAccountData(current)
+            for (const secret of account.secrets) {
+                secret.content = await reencrypt(secret.content, currentMasterPassword, newMasterPassword)
+                secret.description = await reencrypt(secret.description, currentMasterPassword, newMasterPassword)
+            }
+            for (const service of account.services) {
+                const alphabet = account.alphabets.find((a: any) => a.id === service.alphabet)
+                const password = await getServicePassword(currentMasterPassword, service, alphabet)
+                service.password = await encodeData(newMasterPassword, password)
+                service.description = await reencrypt(service.description, currentMasterPassword, newMasterPassword)
+            }
+            if (!account.settings.some((setting: any) => setting.id === "store-master-verifier" && setting.value === false)) account.master = await createMasterVerifier(newMasterPassword)
+            return { account: { ...account, session }, result: undefined }
+        })
+        announceMasterPasswordChange({ accountId, revision: session.revision, closeOtherSessions, handoff })
+        showAlert(t("Master password changed. Existing service passwords were preserved."), "success", "key", 5000)
         return true
-    } catch (error) {
-        showAlert("Failed to change master password", "error", "exclamation-circle", 5000)
+    } catch {
+        showAlert(t("Could not change the master password. Check the current password and retry. Existing data was kept."), "error", "exclamation-circle", 5000)
         return false
     }
 }

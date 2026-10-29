@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
 import { createAccount, setAccountMasterPassword } from "@logic/account"
@@ -41,15 +42,15 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
     const handleSubmit = async () => {
 
         const trimmedName = form.name.trim()
-        const trimmedPassword = form.password.trim()
+        const trimmedPassword = form.password
 
         if (!trimmedName) {
-            showAlert("Please enter an account name", "error", "alert-circle", 3000)
+            showAlert(t("Please enter an account name"), "error", "alert-circle", 3000)
             return
         }
 
         if (!trimmedPassword) {
-            showAlert("Please enter a master password", "error", "alert-circle", 3000)
+            showAlert(t("Please enter a master password"), "error", "alert-circle", 3000)
             return
         }
 
@@ -64,7 +65,7 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
                 })
             }
 
-            showAlert(`<b>${trimmedName}</b> account created successfully!`, "success", "check", 5000)
+            showAlert(t("{{value0}} account created successfully!", { value0: trimmedName }), "success", "check", 5000)
             setForm(getEmptyForm())
             
             if (accountId) {
@@ -73,7 +74,7 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
             
             onClose()
         } catch (error) {
-            showAlert("Failed to create account", "error", "alert-circle", 3000)
+            showAlert(t("Failed to create account"), "error", "alert-circle", 3000)
             console.error(error)
         }
     }
@@ -81,19 +82,19 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
     return (
         <Dialog
             open={open}
-            title="Create New Account"
+            title={t("Create New Account")}
             onClose={handleClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             onClick: handleClose
                         },
                         {
-                            label: "Create",
+                            label: t("Create"),
                             variant: "success",
                             position: "end",
                             onClick: handleSubmit
@@ -103,8 +104,8 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
             }
         >
             <DialogOption
-                title="Account Name"
-                description="Enter a name for this account"
+                title={t("Account Name")}
+                description={t("Enter a name for this account")}
                 layout="row"
             >
                 <Input
@@ -112,7 +113,7 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
                     name="account-name"
                     type="text"
                     value={form.name}
-                    placeholder="My Personal Account"
+                    placeholder={t("My Personal Account")}
                     onChange={(event: any) => {
                         setForm({ ...form, name: event.target.value })
                     }}
@@ -121,8 +122,8 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Account Icon"
-                description="Choose an icon for this account"
+                title={t("Account Icon")}
+                description={t("Choose an icon for this account")}
                 layout="row"
             >
                 <IconSelector
@@ -138,8 +139,8 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Master Password"
-                description="Set the master password for this account"
+                title={t("Master Password")}
+                description={t("Set the master password for this account")}
                 layout="row"
             >
                 <Input
@@ -147,7 +148,7 @@ const CreateAccountModal = (props: CreateAccountModalProps) => {
                     name="account-password"
                     type="password"
                     value={form.password}
-                    placeholder="Enter a secure password"
+                    placeholder={t("Enter a secure password")}
                     onChange={(event: any) => {
                         setForm({ ...form, password: event.target.value })
                     }}

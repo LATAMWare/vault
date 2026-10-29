@@ -1,0 +1,112 @@
+.language-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    color: #e8def3;
+}
+.language-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.language-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 7px 9px;
+    border: 1px solid #ffffff17;
+    border-radius: 8px;
+    background: #ffffff04;
+    cursor: pointer;
+    list-style: none;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+.language-trigger::-webkit-details-marker {
+    display: none;
+}
+.language-trigger:hover,
+.language-dropdown[open] .language-trigger {
+    background: #b698ef12;
+    border-color: #bba0ef38;
+}
+.language-flag {
+    width: 25px;
+    height: 17px;
+    border-radius: 3px;
+    display: block;
+    flex: none;
+}
+.language-chevron {
+    width: 12px;
+    height: 12px;
+    color: #b19ac6;
+    transition: transform 0.18s ease;
+}
+.language-dropdown[open] .language-chevron {
+    transform: rotate(180deg);
+}
+.language-popover {
+    position: absolute;
+    z-index: 120;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 156px;
+    padding: 5px;
+    border: 1px solid #cfb0ea28;
+    border-radius: 11px;
+    background: #292131;
+    box-shadow: 0 12px 35px #0005;
+    transform-origin: top right;
+}
+.language-option {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 10px 9px;
+    border-radius: 7px;
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+    font-size: 12px;
+    color: #c7b6d8;
+    white-space: nowrap;
+    text-align: left;
+    transition: background 0.12s;
+}
+.language-option:hover {
+    background: #ffffff07;
+    color: #f0e5fa;
+}
+.language-option[aria-pressed="true"] {
+    background: #b492e51a;
+    color: #e1c7ff;
+}
+.language-option > svg:last-child:not(.language-flag) {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+    color: #c2a2ee;
+}
+.language-dropdown[open] .language-popover {
+    animation: language-reveal 0.17s ease-out both;
+}
+@keyframes language-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .language-selector * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

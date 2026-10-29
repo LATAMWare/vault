@@ -1,7 +1,6 @@
 import Home from "@component/sections/home"
 import Access from "@component/sections/access"
 import FAQPage from "@component/sections/faq"
-import LegalPage from "@component/sections/legal"
 import Settings from "@component/sections/settings"
 import Vault from "@component/sections/vault"
 import Accounts from "@component/sections/accounts"
@@ -53,7 +52,6 @@ const Content = ({
                 />
             )}
 
-            {activeSection === "legal" && <LegalPage />}
             {activeSection === "faq" && <FAQPage />}
 
             {activeSection === "alphabets" && <Alphabets accountId={accountId} />}

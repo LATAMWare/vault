@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { getStorage, setStorage } from "@logic/storage"
 import { updateSettings, getAccountSettings } from "@logic/settings"
 import { generateId } from "@logic/utils"
@@ -110,6 +111,7 @@ export const getAlphabet = ({ accountId, alphabetId }: { accountId: string, alph
 }
 
 export const createAlphabet = ({ accountId, name, identifier, characters, description, icon }: { accountId: string, name: string, identifier: string, characters: string, description: string, icon: string }) => {
+    if (!identifier.trim() || !characters || Array.from(characters).length > 65536) throw new Error(t("Enter a valid alphabet"))
 
     let account = getStorage(accountId)
     const alphabets = getAlphabetList(accountId)
@@ -153,6 +155,11 @@ export const updateAlphabet = ({ accountId, alphabetId, name, identifier, charac
 
     let account = getStorage(accountId)
     let alphabets = getAlphabetList(accountId)
+    const original = alphabets.find((alphabet: any) => alphabet.id === alphabetId)
+    if (!identifier.trim() || !characters || Array.from(characters).length > 65536) throw new Error(t("Enter a valid alphabet"))
+    if (original && (original.identifier !== identifier || original.characters !== characters) && account.services?.some((service: any) => service.alphabet === alphabetId)) {
+        throw new Error(t("This alphabet is in use. Create a new alphabet to change password generation."))
+    }
 
     for (let index = 0; index < alphabets.length; index++) {
         if(alphabets[index].id === alphabetId) {
@@ -178,6 +185,7 @@ export const deleteAlphabet = (accountId: string, alphabetId: string) => {
 
     let account = getStorage(accountId)
     let alphabets = getAlphabetList(accountId)
+    if (account.services?.some((service: any) => service.alphabet === alphabetId)) throw new Error(t("This alphabet is used by a service and cannot be deleted"))
 
     for (let i = 0; i < alphabets.length; i++) {
         if(alphabets[i].id === alphabetId) {
@@ -193,6 +201,8 @@ export const deleteAlphabet = (accountId: string, alphabetId: string) => {
 
     setStorage(accountId, account)
 
+    const defaultAlphabet = getAccountSettings(accountId).find((setting: any) => setting.id === "default-alphabet")
+    if (defaultAlphabet?.value !== alphabetId) return
     if(alphabets.length > 0) {
         updateSettings({
             accountId,

@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { cloneElement, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from "react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, useSortable, rectSortingStrategy } from "@dnd-kit/sortable"
@@ -247,7 +248,7 @@ const Vault = (props: VaultProps) => {
                                     onClick={ () => handleCreateService() }
                                 >
                                     <i className="ti ti-plus text-8xl mb-2" />
-                                    <span className="text-sm">Create New</span>
+                                    <span className="text-sm">{t("Create New")}</span>
                                 </button>
                             </div>
 

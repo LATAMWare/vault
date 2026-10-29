@@ -1,6 +1,7 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
-import { getAccountName, deleteAccount, getAccounts, changeMasterPassword, checkAccountMasterPassword } from "@logic/account"
+import { getAccountName, deleteAccount, changeMasterPassword, checkAccountMasterPassword } from "@logic/account"
 import { getStorage, setStorage } from "@logic/storage"
 import { showAlert } from "@logic/alert"
 
@@ -15,11 +16,12 @@ type EditAccountModalProps = {
     accountId: string
     onUpdate: () => void
     onClose: () => void
+    onPasswordChanged: (masterPassword: string) => void
 }
 
 const EditAccountModal = (props: EditAccountModalProps) => {
 
-    const { open, accountId, onUpdate, onClose } = props
+    const { open, accountId, onUpdate, onClose, onPasswordChanged } = props
 
     const getEmptyForm = () => ({
         name: "",
@@ -31,6 +33,9 @@ const EditAccountModal = (props: EditAccountModalProps) => {
     const [ newMasterPassword, setNewMasterPassword ] = useState<string>("")
     const [ deleteMasterPassword, setDeleteMasterPassword ] = useState<string>("")
     const [ isDeleteConfirmOpen, setIsDeleteConfirmOpen ] = useState(false)
+    const [ isPasswordConfirmOpen, setIsPasswordConfirmOpen ] = useState(false)
+    const [ closeOtherSessions, setCloseOtherSessions ] = useState(true)
+    const [ isChangingPassword, setIsChangingPassword ] = useState(false)
 
     useEffect(() => {
         if (!open || !accountId) {
@@ -49,6 +54,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         setForm(getEmptyForm())
         setCurrentMasterPassword("")
         setNewMasterPassword("")
+        setIsPasswordConfirmOpen(false)
         onClose()
     }
 
@@ -57,7 +63,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         const currentAccountId = getStorage("current-account") || ""
 
         if (currentAccountId !== accountId) {
-            showAlert("Only the active account can be edited.", "error", "alert-circle", 3000)
+            showAlert(t("Only the active account can be edited."), "error", "alert-circle", 3000)
             onClose()
             return
         }
@@ -65,13 +71,13 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         const nextName = form.name.trim()
 
         if (!nextName) {
-            showAlert("Please enter an account name", "error", "alert-circle", 3000)
+            showAlert(t("Please enter an account name"), "error", "alert-circle", 3000)
             return
         }
 
         const account = getStorage(accountId)
         if (!account || !Array.isArray(account.settings)) {
-            showAlert("Unable to update this account", "error", "alert-circle", 3000)
+            showAlert(t("Unable to update this account"), "error", "alert-circle", 3000)
             return
         }
 
@@ -86,7 +92,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         })
 
         setStorage(accountId, { ...account, settings })
-        showAlert(`<b>${nextName}</b> account updated successfully!`, "success", "check", 5000)
+        showAlert(t("{{value0}} account updated successfully!", { value0: nextName }), "success", "check", 5000)
         onUpdate()
         onClose()
 
@@ -98,7 +104,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         const currentAccountId = getStorage("current-account") || ""
 
         if (currentAccountId !== accountId) {
-            showAlert("Only the active account can be edited.", "error", "alert-circle", 3000)
+            showAlert(t("Only the active account can be edited."), "error", "alert-circle", 3000)
             onClose()
             return
         }
@@ -109,7 +115,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
 
     const handleDeleteSubmit = async () => {
         if (!deleteMasterPassword.trim()) {
-            showAlert("Please enter your Master Password", "error", "exclamation-circle", 5000)
+            showAlert(t("Please enter your Master Password"), "error", "exclamation-circle", 5000)
             return
         }
 
@@ -119,11 +125,11 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         })
 
         if (!isValidPassword) {
-            showAlert("Master Password is incorrect", "error", "exclamation-circle", 5000)
+            showAlert(t("Master Password is incorrect"), "error", "exclamation-circle", 5000)
             return
         }
 
-        const accounts = getAccounts()
+
 
         deleteAccount(accountId)
 
@@ -134,7 +140,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         setDeleteMasterPassword("")
         setIsDeleteConfirmOpen(false)
 
-        showAlert("Account deleted successfully", "success", "check", 5000)
+        showAlert(t("Account deleted successfully"), "success", "check", 5000)
         onUpdate()
         onClose()
 
@@ -144,7 +150,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
     const handleChangeMasterPasswordSubmit = async () => {
 
         if (!currentMasterPassword) {
-            return showAlert("Please enter your current Master Password", 'error', 'exclamation-circle', 5000)
+            return showAlert(t("Please enter your current Master Password"), 'error', 'exclamation-circle', 5000)
         }
 
         const isValidPassword = await checkAccountMasterPassword({
@@ -153,31 +159,38 @@ const EditAccountModal = (props: EditAccountModalProps) => {
         })
 
         if (!isValidPassword) {
-            return showAlert("Current Master Password is incorrect", 'error', 'exclamation-circle', 5000)
+            return showAlert(t("Current Master Password is incorrect"), 'error', 'exclamation-circle', 5000)
         }
 
         if(!newMasterPassword) {
-            return showAlert("Please enter a new Master Password", 'error', 'exclamation-circle', 5000)
+            return showAlert(t("Please enter a new Master Password"), 'error', 'exclamation-circle', 5000)
         }
 
         if(newMasterPassword === currentMasterPassword) {
-            return showAlert("New Master Password cannot be the same as the current", 'error', 'exclamation-circle', 5000)
+            return showAlert(t("New Master Password cannot be the same as the current"), 'error', 'exclamation-circle', 5000)
         }
 
-        const confirmation = confirm("Are you sure you want to change the master password? All your passwords will be re-encrypted with the new master password. This action cannot be undone.")
-        if (!confirmation) return
-        
+        setCloseOtherSessions(true)
+        setIsPasswordConfirmOpen(true)
+    }
+
+    const confirmPasswordChange = async () => {
+        if (isChangingPassword) return
+        setIsChangingPassword(true)
         const success = await changeMasterPassword({
             accountId,
-            newMasterPassword
+            currentMasterPassword,
+            newMasterPassword,
+            closeOtherSessions
         })
-        
+        setIsChangingPassword(false)
         if (success) {
+            onPasswordChanged(newMasterPassword)
             setCurrentMasterPassword("")
             setNewMasterPassword("")
-            setTimeout(() => {
-                window.location.reload()
-            }, 2000)
+            setIsPasswordConfirmOpen(false)
+            onUpdate()
+            onClose()
         }
 
     }
@@ -185,26 +198,41 @@ const EditAccountModal = (props: EditAccountModalProps) => {
     return (
         <>
             <Dialog
-                open={open}
-                title="Edit Account"
+                open={isPasswordConfirmOpen}
+                title={t("Change Master Password")}
+                dismissible={!isChangingPassword}
+                onClose={() => { if (!isChangingPassword) setIsPasswordConfirmOpen(false) }}
+                footer={<DialogFooter buttons={[
+                    { label: t("Cancel"), variant: "cancel", disabled: isChangingPassword, onClick: () => setIsPasswordConfirmOpen(false) },
+                    { label: isChangingPassword ? t("Changing...") : t("Confirm change"), variant: "success", disabled: isChangingPassword, onClick: confirmPasswordChange }
+                ]} />}
+            >
+                <p className="mb-4">{t("Your secrets will be encrypted with the new master password. Your existing service passwords will stay the same.")}</p>
+                <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={closeOtherSessions} disabled={isChangingPassword || typeof BroadcastChannel === "undefined"} onChange={event => setCloseOtherSessions(event.target.checked)} /> {t("Close other sessions of this account")} </label>
+                <p className="mt-3 text-sm text-white/60">{t("Applies to other tabs of this browser on this site. Other devices and the Chrome extension are independent and must be locked separately.")}</p>
+            </Dialog>
+            <Dialog
+                open={open && !isPasswordConfirmOpen}
+                title={t("Edit Account")}
                 onClose={handleClose}
                 contentClassName="flex flex-col"
                 footer={
                     <DialogFooter
                         buttons={[
                             {
-                                label: "Delete",
+                                label: t("Delete"),
                                 variant: "delete",
                                 onClick: handleDelete
                             },
                             {
-                                label: "Cancel",
+                                label: t("Cancel"),
                                 variant: "cancel",
                                 position: "end",
                                 onClick: handleClose
                             },
                             {
-                                label: "Save",
+                                label: t("Save"),
                                 variant: "success",
                                 position: "end",
                                 onClick: handleSubmit
@@ -214,8 +242,8 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                 }
             >
                 <DialogOption
-                    title="Account Name"
-                    description="Update the display name for this account"
+                    title={t("Account Name")}
+                    description={t("Update the display name for this account")}
                     layout="row"
                 >
                     <Input
@@ -223,7 +251,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                         name="account-edit-name"
                         type="text"
                         value={form.name}
-                        placeholder="My Personal Account"
+                        placeholder={t("My Personal Account")}
                         onChange={(event: any) => {
                             setForm({ ...form, name: event.target.value })
                         }}
@@ -231,28 +259,28 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                     />
                 </DialogOption>
                 <DialogOption
-                    title="Account Icon"
-                    description="Update the icon for this account"
+                    title={t("Account Icon")}
+                    description={t("Update the icon for this account")}
                     layout="row"
                 >
                     <IconSelector
                         id="account-edit-icon"
                         value={form.icon}
-                        onChange={({ settingId, value }: { settingId: string, value: string }) => {
+                        onChange={({ value }: { settingId: string, value: string }) => {
                             setForm({ ...form, icon: value })
                         }}
                     />
                 </DialogOption>
                 <DialogOption
-                    title="Change Master Password"
-                    description={`Change the master password for this account. <span style="color: #ff2056; font-weight: bold; font-family: Inter Bold;">All your passwords will be re-encrypted with the new master password. Backup your data, this action cannot be undone.</span>`}
+                    title={t("Change Master Password")}
+                    description={t("Encrypt your secrets with a new master password while preserving existing service passwords. Keep an encrypted backup before changing it.")}
                     layout="col"
                 >
                     <div className="w-full">
                         <Input
                             id="current-master-password-edit"
                             type="password"
-                            placeholder="Current Master Password"
+                            placeholder={t("Current Master Password")}
                             value={ currentMasterPassword }
                             onChange={ (event: React.ChangeEvent<HTMLInputElement>) => setCurrentMasterPassword(event.target.value) }
                             className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md mb-3"
@@ -260,7 +288,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                         <Input
                             id="new-master-password-edit"
                             type="password"
-                            placeholder="New Master Password"
+                            placeholder={t("New Master Password")}
                             value={ newMasterPassword }
                             onChange={ (event: React.ChangeEvent<HTMLInputElement>) => setNewMasterPassword(event.target.value) }
                             className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md mb-3"
@@ -268,16 +296,14 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                         <button
                             onClick={ handleChangeMasterPasswordSubmit }
                             className="font-inter-bold h-fit w-full px-3 py-3 border duration-300 bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 hover:text-white focus:bg-rose-500/20 focus:border-rose-500 squircle-md cursor-pointer"
-                        >
-                            Change Master Password
-                        </button>
+                        > {t("Change Master Password")} </button>
                     </div>
                 </DialogOption>
             </Dialog>
 
             <Dialog
                 open={isDeleteConfirmOpen}
-                title="Delete Account"
+                title={t("Delete Account")}
                 onClose={() => {
                     setDeleteMasterPassword("")
                     setIsDeleteConfirmOpen(false)
@@ -287,7 +313,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                     <DialogFooter
                         buttons={[
                             {
-                                label: "Cancel",
+                                label: t("Cancel"),
                                 variant: "cancel",
                                 onClick: () => {
                                     setDeleteMasterPassword("")
@@ -295,7 +321,7 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                                 }
                             },
                             {
-                                label: "Delete",
+                                label: t("Delete"),
                                 variant: "delete",
                                 position: "end",
                                 onClick: handleDeleteSubmit
@@ -305,15 +331,15 @@ const EditAccountModal = (props: EditAccountModalProps) => {
                 }
             >
                 <DialogOption
-                    title="Confirm deletion"
-                    description="This action will permanently delete the account and all its data. Enter the Master Password to continue."
+                    title={t("Confirm deletion")}
+                    description={t("This action will permanently delete the account and all its data. Enter the Master Password to continue.")}
                     layout="col"
                     className="max-w-100"
                 >
                     <Input
                         id="delete-account-master-password"
                         type="password"
-                        placeholder="Master Password"
+                        placeholder={t("Master Password")}
                         value={deleteMasterPassword}
                         onChange={(event: React.ChangeEvent<HTMLInputElement>) => setDeleteMasterPassword(event.target.value)}
                         className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md"

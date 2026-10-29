@@ -1,10 +1,11 @@
-import { getStorage, setStorage } from "@logic/storage"
+import { getStorage, setStorage, clearAccountSession } from "@logic/storage"
 import { createDefaultAlphabet } from "@logic/alphabet"
 import { createDefaultVault } from "@logic/vault"
 import { createDefaultSettings } from "@logic/settings"
 import { deleteChromeExtensionAccount } from "@logic/service"
 
 export const resetAllData = async (accountId: string) => {
+    clearAccountSession(accountId)
     createDefaultAlphabet(accountId)
     createDefaultVault(accountId)
     createDefaultSettings(accountId)

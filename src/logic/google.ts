@@ -1,6 +1,8 @@
+import { t } from "@logic/i18n"
 import { getSessionStorage, getStorage, removeSessionStorage, setSessionStorage, setStorage } from "./storage.ts"
 import { showAlert } from "./alert.ts"
-import { decodeData, encodeData } from "./utils.ts"
+import { restoreAccountData } from "./account.ts"
+import { encodeData } from "./utils.ts"
 
 declare global {
     interface Window {
@@ -19,7 +21,7 @@ export const getGoogleClientId = () => {
     if (typeof window !== "undefined" && window.__VAULT_CONFIG__?.googleClientId) {
         return String(window.__VAULT_CONFIG__.googleClientId).trim()
     }
-    if (import.meta.env.DEV && import.meta.env.PUBLIC_GOOGLE_CLIENT_ID) {
+    if (import.meta.env?.DEV && import.meta.env.PUBLIC_GOOGLE_CLIENT_ID) {
         return String(import.meta.env.PUBLIC_GOOGLE_CLIENT_ID).trim()
     }
     return "REPLACE_WITH_GOOGLE_CLIENT_ID"
@@ -123,15 +125,16 @@ const requestGoogleDriveAccessToken = async ({ accountId, prompt }: { accountId:
             client_id: getGoogleClientId(),
             scope: DRIVE_SCOPE,
             prompt,
+            error_callback: () => reject(new Error(t("Google authorization was closed or blocked. Connect again to retry."))),
             callback: (response: any) => {
                 if (response?.error) {
-                    reject(new Error(response.error_description || response.error || "Google Drive token request was denied."))
+                    reject(new Error(response.error_description || response.error || t("Google Drive token request was denied.")))
                     return
                 }
 
                 const token = String(response?.access_token || "")
                 if (!token) {
-                    reject(new Error("Google Drive token request failed: no access token returned."))
+                    reject(new Error(t("Google Drive token request failed: no access token returned.")))
                     return
                 }
 
@@ -159,7 +162,7 @@ const getFreshGoogleDriveAccessToken = async (accountId: string) => {
     const currentToken = state.accessToken
 
     if (!state.connected || !currentToken) {
-        throw new Error("You are not connected to Google Drive")
+        throw new Error(t("You are not connected to Google Drive"))
     }
 
     if (!isGoogleDriveAccessTokenExpired({ accessToken: currentToken, expiresAt: state.expiresAt })) {
@@ -172,7 +175,7 @@ const getFreshGoogleDriveAccessToken = async (accountId: string) => {
         if (error?.message) {
             showAlert(error.message, "error", "exclamation-circle", 5000)
         }
-        throw new Error("Your Google Drive session expired. Connect again to Google Drive.")
+        throw new Error(t("Your Google Drive session expired. Connect again to Google Drive."))
     }
 }
 
@@ -184,18 +187,18 @@ export const disconnectGoogleDrive = (accountId: string) => {
         expiresAt: 0
     })
     removeSessionStorage(GOOGLE_DRIVE_SESSION_KEY(accountId))
-    showAlert("Google Drive has been disconnected", "success", "brand-google-drive", 5000)
+    showAlert(t("Google Drive has been disconnected"), "success", "brand-google-drive", 5000)
 }
 
 const ensureGoogleDriveSdk = () => new Promise<void>((resolve, reject) => {
 
     if (!isGoogleDriveConfigured()) {
-        reject(new Error("Google Drive is not configured. Add PUBLIC_GOOGLE_CLIENT_ID to your .env file."))
+        reject(new Error(t("Google Drive is not configured. Add PUBLIC_GOOGLE_CLIENT_ID to your .env file.")))
         return
     }
 
     if (typeof window === "undefined") {
-        reject(new Error("Google Drive sync is only available in the browser."))
+        reject(new Error(t("Google Drive sync is only available in the browser.")))
         return
     }
 
@@ -208,7 +211,7 @@ const ensureGoogleDriveSdk = () => new Promise<void>((resolve, reject) => {
 
     if (existingScript) {
         existingScript.addEventListener("load", () => resolve(), { once: true })
-        existingScript.addEventListener("error", () => reject(new Error("Could not load Google Identity Services.")), { once: true })
+        existingScript.addEventListener("error", () => reject(new Error(t("Could not load Google Identity Services."))), { once: true })
         return
     }
 
@@ -218,7 +221,7 @@ const ensureGoogleDriveSdk = () => new Promise<void>((resolve, reject) => {
     script.defer = true
     script.setAttribute("data-google-gsi", "true")
     script.onload = () => resolve()
-    script.onerror = () => reject(new Error("Could not load Google Identity Services."))
+    script.onerror = () => { script.remove(); reject(new Error(t("Could not load Google Identity Services."))) }
     document.head.appendChild(script)
 
 })
@@ -255,7 +258,7 @@ const getGoogleUserProfile = async (accessToken: string) => {
 export const connectGoogleDrive = async ({ accountId }: { accountId: string }) => {
 
     if (!isGoogleDriveConfigured()) {
-        showAlert("Google Drive is not configured. Add PUBLIC_GOOGLE_CLIENT_ID in .env.", "error", "exclamation-circle", 5000)
+        showAlert(t("Google Drive is not configured. Add PUBLIC_GOOGLE_CLIENT_ID in .env."), "error", "exclamation-circle", 5000)
         return null
     }
 
@@ -267,16 +270,20 @@ export const connectGoogleDrive = async ({ accountId }: { accountId: string }) =
                 client_id: getGoogleClientId(),
                 scope: DRIVE_SCOPE,
                 prompt: "consent",
+                error_callback: () => {
+                    showAlert(t("Google authorization was closed or blocked. Try connecting again."), "error", "exclamation-circle", 5000)
+                    resolve(null)
+                },
                 callback: async (response: any) => {
                     if (response?.error) {
-                        showAlert("Google Drive connection was denied", "error", "exclamation-circle", 5000)
+                        showAlert(t("Google Drive connection was denied"), "error", "exclamation-circle", 5000)
                         resolve(null)
                         return
                     }
 
                     const token = String(response.access_token || "")
                     if (!token) {
-                        showAlert("Google Drive connection failed: no access token returned", "error", "exclamation-circle", 5000)
+                        showAlert(t("Google Drive connection failed: no access token returned"), "error", "exclamation-circle", 5000)
                         resolve(null)
                         return
                     }
@@ -291,7 +298,7 @@ export const connectGoogleDrive = async ({ accountId }: { accountId: string }) =
                     }
 
                     setGoogleDriveState(accountId, nextState)
-                    showAlert("Connected to Google Drive", "success", "brand-google-drive", 5000)
+                    showAlert(t("Connected to Google Drive"), "success", "brand-google-drive", 5000)
                     resolve(nextState)
                 }
             })
@@ -299,58 +306,36 @@ export const connectGoogleDrive = async ({ accountId }: { accountId: string }) =
             client.requestAccessToken()
         })
     } catch (error: any) {
-        showAlert(error?.message || "Google Drive connection failed", "error", "exclamation-circle", 5000)
+        showAlert(error?.message || t("Google Drive connection failed"), "error", "exclamation-circle", 5000)
         return null
     }
 }
 
+const listDriveVaultFiles = async (accountId: string) => {
+    const token = await getFreshGoogleDriveAccessToken(accountId)
+    const files: Array<{ id: string, name: string }> = []
+    const seenPages = new Set<string>()
+    let pageToken = ""
+    do {
+        const query = new URLSearchParams({ spaces: "appDataFolder", fields: "nextPageToken,files(id,name)", pageSize: "1000", supportsAllDrives: "true" })
+        if (pageToken) query.set("pageToken", pageToken)
+        const response = await fetch(DRIVE_API + "/files?" + query.toString(), { headers: { Authorization: "Bearer " + token } })
+        if (!response.ok) throw new Error(t("Google Drive request failed"))
+        const data = await response.json()
+        files.push(...(Array.isArray(data.files) ? data.files : []).filter((file: any) => typeof file?.id === "string" && typeof file?.name === "string" && file.name.toLowerCase().endsWith(".vault")))
+        pageToken = typeof data.nextPageToken === "string" ? data.nextPageToken : ""
+        if (pageToken && seenPages.has(pageToken)) throw new Error(t("Google Drive returned a repeated page token"))
+        seenPages.add(pageToken)
+    } while (pageToken)
+    return files
+}
+
 const getDriveAppDataFiles = async (accountId: string) => {
-
-    const token = await getFreshGoogleDriveAccessToken(accountId)
-
-    const response = await fetch(`${DRIVE_API}/files?spaces=appDataFolder&fields=files(id,name)&supportsAllDrives=true`, {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    })
-
-    if (!response.ok) {
-        throw new Error("Google Drive request failed")
-    }
-
-    const data = await response.json()
-    const files = Array.isArray(data.files) ? data.files : []
-    const expectedFileName = buildDriveFileName(accountId, getDriveFileIdentifier(accountId) || accountId).toLowerCase()
-
-    return files.filter((file: any) => {
-        if (typeof file?.name !== "string") {
-            return false
-        }
-
-        const fileName = file.name.toLowerCase()
-        return fileName.endsWith(".vault") && fileName === expectedFileName
-    })
+    const expected = buildDriveFileName(accountId, getDriveFileIdentifier(accountId) || accountId).toLowerCase()
+    return (await listDriveVaultFiles(accountId)).filter(file => file.name.toLowerCase() === expected)
 }
 
-const getAllDriveVaultFiles = async (accountId: string) => {
-
-    const token = await getFreshGoogleDriveAccessToken(accountId)
-
-    const response = await fetch(`${DRIVE_API}/files?spaces=appDataFolder&fields=files(id,name)&supportsAllDrives=true`, {
-        headers: {
-            Authorization: `Bearer ${token}`
-        }
-    })
-
-    if (!response.ok) {
-        throw new Error("Google Drive request failed")
-    }
-
-    const data = await response.json()
-    const files = Array.isArray(data.files) ? data.files : []
-
-    return files.filter((file: any) => typeof file?.name === "string" && file.name.toLowerCase().endsWith(".vault"))
-}
+const getAllDriveVaultFiles = listDriveVaultFiles
 
 const getDriveAppDataFile = async (accountId: string) => {
     const files = await getDriveAppDataFiles(accountId)
@@ -363,7 +348,7 @@ const saveDriveFile = async ({ accountId, fileData }: { accountId: string, fileD
 
     const driveFileId = getDriveFileIdentifier(accountId)
     if (!driveFileId) {
-        throw new Error("Add a Google Drive File ID in Settings before syncing this account.")
+        throw new Error(t("Add a Google Drive File ID in Settings before syncing this account."))
     }
 
     const fileName = buildDriveFileName(accountId, driveFileId)
@@ -398,7 +383,7 @@ const saveDriveFile = async ({ accountId, fileData }: { accountId: string, fileD
 
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(errorText || "Could not update the Google Drive file")
+        throw new Error(errorText || t("Could not update the Google Drive file"))
     }
 
     return true
@@ -415,31 +400,32 @@ export const pushLocalAccountToGoogleDrive = async ({
     const state = getGoogleDriveState(accountId)
 
     if (!state.connected || !state.accessToken) {
-        showAlert("Connect to Google Drive before pushing your data", "error", "exclamation-circle", 5000)
+        showAlert(t("Connect to Google Drive before pushing your data"), "error", "exclamation-circle", 5000)
         return false
     }
 
     if (!getDriveFileIdentifier(accountId)) {
-        showAlert("Add a Google Drive File ID in Settings before pushing data", "error", "exclamation-circle", 5000)
+        showAlert(t("Add a Google Drive File ID in Settings before pushing data"), "error", "exclamation-circle", 5000)
         return false
     }
 
     const account = getStorage(accountId)
     if (!account) {
-        showAlert("No account data found to sync", "error", "exclamation-circle", 5000)
+        showAlert(t("No account data found to sync"), "error", "exclamation-circle", 5000)
         return false
     }
 
     try {
 
-        const encryptedData = await encodeData(masterPassword, JSON.stringify(account))
+        const { drive: _drive, session: _session, ...payload } = account
+        const encryptedData = await encodeData(masterPassword, JSON.stringify(payload))
         await saveDriveFile({ accountId, fileData: encryptedData })
-        showAlert("Local account data was uploaded to Google Drive", "success", "database-import", 5000)
+        showAlert(t("Local account data was uploaded to Google Drive"), "success", "database-import", 5000)
         return true
 
     } catch (error: any) {
 
-        showAlert(error?.message || "Could not upload the account to Google Drive", "error", "exclamation-circle", 5000)
+        showAlert(error?.message || t("Could not upload the account to Google Drive"), "error", "exclamation-circle", 5000)
 
         return false
 
@@ -458,13 +444,13 @@ export const pullGoogleDriveToAccount = async ({
     const state = getGoogleDriveState(accountId)
 
     if (!state.connected || !state.accessToken) {
-        showAlert("Connect to Google Drive before syncing data", "error", "exclamation-circle", 5000)
+        showAlert(t("Connect to Google Drive before syncing data"), "error", "exclamation-circle", 5000)
         return false
     }
 
     const driveFileId = getDriveFileIdentifier(accountId)
     if (!driveFileId) {
-        showAlert("Add a Google Drive File ID in Settings before pulling data", "error", "exclamation-circle", 5000)
+        showAlert(t("Add a Google Drive File ID in Settings before pulling data"), "error", "exclamation-circle", 5000)
         return false
     }
 
@@ -472,7 +458,7 @@ export const pullGoogleDriveToAccount = async ({
 
         const files = await getDriveAppDataFiles(accountId)
         if (!files.length) {
-            showAlert("No matching file was found in Google Drive for ID: <b>" + driveFileId + "</b>", "error", "exclamation-circle", 5000)
+            showAlert(t("No matching file was found in Google Drive for ID: {{value0}}", { value0: driveFileId }), "error", "exclamation-circle", 5000)
             return false
         }
 
@@ -488,21 +474,12 @@ export const pullGoogleDriveToAccount = async ({
                 })
 
                 if (!response.ok) {
-                    throw new Error("Could not download the Google Drive file")
+                    throw new Error(t("Could not download the Google Drive file"))
                 }
 
                 const encryptedData = await response.text()
-                const decodedData = await decodeData(masterPassword, encryptedData)
-                const parsedData = JSON.parse(decodedData)
-                const parsedSettings = Array.isArray(parsedData?.settings) ? parsedData.settings : []
-                const storeMasterSetting = parsedSettings.find((setting: { id?: string }) => setting?.id === "store-master-verifier")
-
-                if (storeMasterSetting && storeMasterSetting.value === false) {
-                    delete parsedData.master
-                }
-
-                setStorage(accountId, parsedData)
-                showAlert("Google Drive data was applied to this account", "success", "database-export", 5000)
+                await restoreAccountData(accountId, masterPassword, encryptedData)
+                showAlert(t("Google Drive data was applied to this account"), "success", "database-export", 5000)
                 return true
             } catch (error: any) {
                 lastError = error
@@ -513,12 +490,12 @@ export const pullGoogleDriveToAccount = async ({
             throw lastError
         }
 
-        showAlert("No valid Google Drive vault could be decrypted with this master password", "error", "exclamation-circle", 5000)
+        showAlert(t("No valid Google Drive vault could be decrypted with this master password"), "error", "exclamation-circle", 5000)
 
         return false
 
     } catch (error: any) {
-        showAlert(error?.message || "Could not import the account from Google Drive", "error", "exclamation-circle", 5000)
+        showAlert(error?.message || t("Could not import the account from Google Drive"), "error", "exclamation-circle", 5000)
         return false
     }
 
@@ -538,7 +515,7 @@ const deleteDriveFiles = async (accountId: string, files: Array<{ id?: string }>
         })
 
         if (!response.ok && response.status !== 404) {
-            throw new Error("Could not delete the Google Drive file")
+            throw new Error(t("Could not delete the Google Drive file"))
         }
     }))
 
@@ -550,14 +527,14 @@ export const deleteCurrentGoogleDriveData = async (accountId: string) => {
         const files = await getDriveAppDataFiles(accountId)
         const deletedCount = await deleteDriveFiles(accountId, files)
         showAlert(
-            deletedCount ? "The current account data was deleted from Google Drive" : "No data was found for this account in Google Drive",
+            deletedCount ? t("The current account data was deleted from Google Drive") : t("No data was found for this account in Google Drive"),
             deletedCount ? "success" : "info",
             deletedCount ? "trash" : "info-circle",
             5000
         )
         return deletedCount > 0
     } catch (error: any) {
-        showAlert(error?.message || "Could not delete the account data from Google Drive", "error", "exclamation-circle", 5000)
+        showAlert(error?.message || t("Could not delete the account data from Google Drive"), "error", "exclamation-circle", 5000)
         return false
     }
 }
@@ -567,14 +544,14 @@ export const deleteAllGoogleDriveData = async (accountId: string) => {
         const files = await getAllDriveVaultFiles(accountId)
         const deletedCount = await deleteDriveFiles(accountId, files)
         showAlert(
-            deletedCount ? "All Vault data was deleted from Google Drive" : "No Vault data was found in Google Drive",
+            deletedCount ? t("All Vault data was deleted from Google Drive") : t("No Vault data was found in Google Drive"),
             deletedCount ? "success" : "info",
             deletedCount ? "trash" : "info-circle",
             5000
         )
         return deletedCount > 0
     } catch (error: any) {
-        showAlert(error?.message || "Could not delete Vault data from Google Drive", "error", "exclamation-circle", 5000)
+        showAlert(error?.message || t("Could not delete Vault data from Google Drive"), "error", "exclamation-circle", 5000)
         return false
     }
 }

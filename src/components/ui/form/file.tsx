@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useRef } from "react"
 
 interface FileInputProps {
@@ -33,8 +34,7 @@ const FileInput = (props: FileInputProps) => {
                 onClick={handleButtonClick}
                 className="file-input-button"
             >
-                <i className="ti ti-database-import text-xl mr-1 align-middle inline-block -mt-1" /> Select File to Import
-            </button>
+                <i className="ti ti-database-import text-xl mr-1 align-middle inline-block -mt-1" /> {t("Select File to Import")} </button>
         </div>
     )
 }

@@ -1,6 +1,7 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
-import { getAlphabetList, getAlphabet } from "@logic/alphabet"
+import { getAlphabetList } from "@logic/alphabet"
 
 import type { IAlphabet } from "@interface/index"
 
@@ -67,8 +68,7 @@ const Alphabets = (props: AlphabetsProps) => {
                         <div className="text-3xl font-inter-black mb-5 flex flex-col md:flex-row">
 
                             <h2>
-                                <i className="ti ti-abc mr-2 align-middle inline-block -mt-1.25" /> Alphabets
-                            </h2>
+                                <i className="ti ti-abc mr-2 align-middle inline-block -mt-1.25" /> {t("Alphabets")} </h2>
                             
                             <div className="mt-3 md:mt-0 md:ml-5 flex flex-row justify-between gap-2">
                                 <button
@@ -97,7 +97,7 @@ const Alphabets = (props: AlphabetsProps) => {
                                     onClick={ () => handleCreateAlphabet() }
                                 >
                                     <i className="ti ti-plus text-8xl mb-2" />
-                                    <span className="text-sm">New Alphabet</span>
+                                    <span className="text-sm">{t("New Alphabet")}</span>
                                 </button>
                             </div>
 

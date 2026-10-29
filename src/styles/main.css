@@ -4,6 +4,8 @@
 @import "./alert.css";
 @import "./text.css";
 @import "./form.css";
+@import "./company.css";
+@import "./language-selector.css";
 
 
 body, html {
@@ -11,8 +13,9 @@ body, html {
     padding: 0;
 }
 
-*:focus, *:focus-visible {
-    outline: none !important;
+:focus-visible {
+    outline: 2px solid #c4b5fd !important;
+    outline-offset: 4px;
 }
 
 html {
@@ -24,20 +27,20 @@ body {
     @apply h-full w-full bg-white dark:bg-darker dark:text-white lite:bg-darker lite:text-white text-white scroll-smooth font-inter text-[15px] antialiased md:subpixel-antialiased overflow-x-hidden selection:text-primary selection:bg-primary/10
 }
 
-*:focus, *:focus-visible {
-    outline: none !important;
+:focus:not(:focus-visible) {
+    outline: none;
 }
 
 b, strong {
     @apply font-inter-bold
 }
 
-:global(html) {
+html {
     scroll-behavior: smooth;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    :global(html) {
+    html {
         scroll-behavior: auto;
     }
 }

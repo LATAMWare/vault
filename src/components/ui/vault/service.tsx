@@ -27,12 +27,13 @@ const ServiceCard = ({
 
     const handleCopyPassword = async () => {
 
-        copyServicePasswordToClipboard({
+        const copied = await copyServicePasswordToClipboard({
             accountId,
             masterPassword,
             serviceId: service.id
         })
 
+        if (!copied) return
         setIsCopied(true)
 
         setTimeout(() => {

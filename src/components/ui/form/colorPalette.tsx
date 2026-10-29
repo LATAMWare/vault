@@ -26,7 +26,10 @@ const ColorPalette = (props: ColorPaletteProps) => {
     return (
         <div className="max-w-27 mr-1 h-full p-1.5 flex gap-1 flex-wrap">
             {colors.map((color) => (
-                <span
+                <button
+                    type="button"
+                    aria-label={color.name}
+                    aria-pressed={value.toLowerCase() === color.hex.toLowerCase()}
                     key={color.hex}
                     onClick={() => {
                         onChange({ settingId: id, value: color.hex })
@@ -34,7 +37,7 @@ const ColorPalette = (props: ColorPaletteProps) => {
                     className="w-5 h-5 rounded-full inline-block cursor-pointer transition-transform hover:scale-110"
                     style={{ backgroundColor: color.hex }}
                     title={color.name}
-                ></span>
+                ></button>
             ))}
         </div>
     )

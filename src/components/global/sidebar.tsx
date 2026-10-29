@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useRef, useState } from "react"
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type Modifier } from "@dnd-kit/core"
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
@@ -7,6 +8,7 @@ import SidebarLogo from "@component/ui/sidebar/logo"
 import SidebarUfo from "@component/ui/sidebar/ufo"
 import SidebarButton from "@component/ui/sidebar/button"
 import MobileMenu from "@component/global/mobile"
+import LanguageSelector from "./language-selector"
 import Search from "@component/sections/search"
 import { useResizePanel } from "@component/global/resize"
 import { getSetting } from "@logic/settings"
@@ -47,7 +49,7 @@ const SortableVault = ({ vault, active, onClick }: { vault: any, active: boolean
                 ref={setActivatorNodeRef}
                 type="button"
                 className="absolute z-999 right-2 flex h-8 w-8 shrink-0 items-center justify-center squircle-md border border-white/20 bg-white/2 text-white transition hover:border-primary hover:bg-primary/20 hover:text-white cursor-grab active:cursor-grabbing duration-300"
-                aria-label={`Drag ${vault.name}`}
+                aria-label={t("Drag {{value0}}", { value0: vault.name })}
                 {...attributes}
                 {...listeners}
             >
@@ -166,9 +168,7 @@ const Sidebar = ({
                             onClick={() => setIsSearchOpen(true)}
                         >
                             <i className="ti ti-search text-base" />
-                            <span>
-                                Search
-                            </span>
+                            <span> {t("Search")} </span>
                         </button>
                     </div>
                 )}
@@ -176,6 +176,8 @@ const Sidebar = ({
                 <button
                     type="button"
                     onClick={() => setIsMobileMenuOpen(true)}
+                    aria-label={t("Open menu")}
+                    aria-expanded={isMobileMenuOpen}
                     className="flex items-center justify-center p-2 border border-white/10 bg-white/2 hover:bg-white/10 squircle-md transition-colors duration-200 cursor-pointer"
                 >
                     <i className="ti ti-menu-2 text-xl text-white" />
@@ -198,7 +200,7 @@ const Sidebar = ({
 
             <div
                 ref={panelRef}
-                className="lite:bg-darker lite:border-white/10 bg-white/2 border-white/10 border squircle-md pb-0 w-full h-full md:shrink-0 hidden md:block overflow-hidden"
+                className="lite:bg-darker lite:border-white/10 bg-white/2 border-white/10 border squircle-md pb-0 w-full h-full md:shrink-0 hidden md:flex md:flex-col overflow-hidden"
                 style={{ width: panelWidth, maxWidth: "100%" }}
             >
                 <div className="relative flex flex-row items-center justify-left px-3 pt-3 mb-1">
@@ -217,22 +219,20 @@ const Sidebar = ({
                                 onClick={() => setIsSearchOpen(true)}
                             >
                                 <i className="ti ti-search text-base" />
-                                <span>
-                                    Search
-                                </span>
+                                <span> {t("Search")} </span>
                             </button>
                         </div>
                     )}
 
                 </div>
 
-                <div className="relative flex h-full flex-col">
+                <div className="relative flex min-h-0 flex-1 flex-col">
                     <div className="flex-1 min-h-0 overflow-auto no-scrollbar-but-scroll mask-to-bottom mask-fade-20 ">
                         <div className="flex flex-col items-left justify-left gap-1 pt-1 px-2 pb-15">
 
                             <SidebarButton
                                 icon="ti-vault"
-                                label="My Vault"
+                                label={t("My Vault")}
                                 active={activePanel === "vault"}
                                 show={ accountId ? false : true }
                                 onClick={() => onPanelChange("home")}
@@ -280,12 +280,13 @@ const Sidebar = ({
                         </div>
                     </div>
 
-                    <div className="w-full h-fit pt-2 pb-2" style={{ minHeight: accountId ? '303px' : '110px' }}>
+                    <div className="w-full h-fit pt-2 pb-2" style={{ minHeight: accountId ? '355px' : '165px' }}>
+                        <LanguageSelector />
                         <div className="w-full h-fit flex flex-col items-left justify-left gap-1 px-2">
 
                             <SidebarButton
                                 icon="ti-question-mark"
-                                label="FAQs"
+                                label={t("FAQs")}
                                 active={activePanel === "faq"}
                                 show={ true }
                                 onClick={() => onPanelChange("faq")}
@@ -293,7 +294,7 @@ const Sidebar = ({
 
                             <SidebarButton
                                 icon="ti ti-vault"
-                                label="New Vault"
+                                label={t("New Vault")}
                                 active={ false }
                                 show={ accountId ? true : false }
                                 onClick={onOpenCreateVaultModal}
@@ -301,7 +302,7 @@ const Sidebar = ({
                             />
                             <SidebarButton
                                 icon="ti-abc"
-                                label="Alphabets"
+                                label={t("Alphabets")}
                                 active={activePanel === "alphabets"}
                                 show={ accountId ? true : false }
                                 onClick={() => onPanelChange("alphabets")}
@@ -309,7 +310,7 @@ const Sidebar = ({
 
                             <SidebarButton
                                 icon="ti-user"
-                                label="Accounts"
+                                label={t("Accounts")}
                                 active={activePanel === "accounts"}
                                 show={ accountId ? true : false }
                                 onClick={() => onPanelChange("accounts")}
@@ -317,7 +318,7 @@ const Sidebar = ({
 
                             <SidebarButton
                                 icon="ti-settings"
-                                label="Settings"
+                                label={t("Settings")}
                                 active={activePanel === "settings"}
                                 show={ accountId ? true : false }
                                 onClick={() => onPanelChange("settings")}

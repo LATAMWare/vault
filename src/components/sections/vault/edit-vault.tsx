@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
 import { getVault, updateVault, deleteVault } from "@logic/vault"
@@ -55,7 +56,7 @@ const EditVaultModal = (props: EditVaultModalProps) => {
     const handleSubmit = () => {
 
         if (!vaultForm.name.trim()) {
-            return showAlert("Please fill in the vault name.", "error", "alert-circle", 3000)
+            return showAlert(t("Please fill in the vault name."), "error", "alert-circle", 3000)
         }
 
         try {
@@ -66,14 +67,14 @@ const EditVaultModal = (props: EditVaultModalProps) => {
                 vaultIcon: vaultForm.icon
             })
 
-            showAlert(`<b>${vaultForm.name}</b> vault updated successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} vault updated successfully!", { value0: vaultForm.name }), 'success', 'check', 5000)
 
             setVaultForm(getEmptyVaultForm())
             onUpdate()
             onClose()
 
         } catch (error) {
-            showAlert("Error updating vault. Please try again.", "error", "alert-circle", 3000)
+            showAlert(t("Error updating vault. Please try again."), "error", "alert-circle", 3000)
             console.error("Error updating vault:", error)
         }
     }
@@ -83,19 +84,19 @@ const EditVaultModal = (props: EditVaultModalProps) => {
         if (!vaultId) return
 
         const confirmed = window.confirm(
-            `Are you sure you want to delete this vault and all of its services and secrets? This action cannot be undone.`
+            t("Are you sure you want to delete this vault and all of its services and secrets? This action cannot be undone.")
         )
 
         if (!confirmed) return
 
         try {
             deleteVault({ accountId, vaultId })
-            showAlert(`<b>${vaultForm.name || "Vault"}</b> deleted successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} deleted successfully!", { value0: vaultForm.name || t("Vault") }), 'success', 'check', 5000)
             setVaultForm(getEmptyVaultForm())
             onUpdate()
             onClose()
         } catch (error) {
-            showAlert("Error deleting vault. Please try again.", "error", "alert-circle", 3000)
+            showAlert(t("Error deleting vault. Please try again."), "error", "alert-circle", 3000)
             console.error("Error deleting vault:", error)
         }
     }
@@ -103,25 +104,25 @@ const EditVaultModal = (props: EditVaultModalProps) => {
     return (
         <Dialog
             open={open}
-            title="Edit Vault"
+            title={t("Edit Vault")}
             onClose={handleClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Delete",
+                            label: t("Delete"),
                             variant: "delete",
                             onClick: handleDelete
                         },
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             position: "end",
                             onClick: handleClose
                         },
                         {
-                            label: "Save",
+                            label: t("Save"),
                             variant: "success",
                             position: "end",
                             onClick: handleSubmit
@@ -131,8 +132,8 @@ const EditVaultModal = (props: EditVaultModalProps) => {
             }
         >
             <DialogOption
-                title="Vault Name"
-                description="Update the display name for this vault"
+                title={t("Vault Name")}
+                description={t("Update the display name for this vault")}
                 layout="row"
             >
                 <Input
@@ -140,7 +141,7 @@ const EditVaultModal = (props: EditVaultModalProps) => {
                     name="vault-name"
                     type="text"
                     value={vaultForm.name}
-                    placeholder="e.g. My Personal Vault"
+                    placeholder={t("e.g. My Personal Vault")}
                     onChange={(event: any) => {
                         setVaultForm({ ...vaultForm, name: event.target.value })
                     }}
@@ -149,8 +150,8 @@ const EditVaultModal = (props: EditVaultModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Vault Icon"
-                description="Select a new icon for the vault"
+                title={t("Vault Icon")}
+                description={t("Select a new icon for the vault")}
                 layout="row"
             >
                 <IconSelector

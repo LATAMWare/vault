@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
 import { getAlphabet, updateAlphabet, deleteAlphabet } from "@logic/alphabet"
@@ -68,15 +69,15 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
     const handleSubmit = () => {
 
         if (!form.name.trim()) {
-            return showAlert("Please fill in the alphabet name.", "error", "alert-circle", 3000)
+            return showAlert(t("Please fill in the alphabet name."), "error", "alert-circle", 3000)
         }
 
         if (!form.identifier.trim()) {
-            return showAlert("Please fill in the identifier.", "error", "alert-circle", 3000)
+            return showAlert(t("Please fill in the identifier."), "error", "alert-circle", 3000)
         }
 
         if (!form.characters.trim()) {
-            return showAlert("Please fill in the characters.", "error", "alert-circle", 3000)
+            return showAlert(t("Please fill in the characters."), "error", "alert-circle", 3000)
         }
 
         try {
@@ -90,14 +91,14 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
                 icon: form.icon
             })
 
-            showAlert(`<b>${form.name}</b> alphabet updated successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} alphabet updated successfully!", { value0: form.name }), 'success', 'check', 5000)
 
             setForm(getEmptyForm())
             onUpdate()
             onClose()
 
         } catch (error) {
-            showAlert("Error updating alphabet. Please try again.", "error", "alert-circle", 3000)
+            showAlert(error instanceof Error ? error.message : t("Error updating alphabet. Please try again."), "error", "alert-circle", 3000)
             console.error("Error updating alphabet:", error)
         }
     }
@@ -107,7 +108,7 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
         if (!alphabetId) return
 
         const confirmed = window.confirm(
-            `Are you sure you want to delete the "${form.name}" alphabet? All services that use this alphabet will be affected. This action cannot be undone.`
+            t("Are you sure you want to delete the \"{{value0}}\" alphabet? All services that use this alphabet will be affected. This action cannot be undone.", { value0: form.name })
         )
 
         if (!confirmed) return
@@ -115,13 +116,13 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
         try {
 
             deleteAlphabet(accountId, alphabetId)
-            showAlert(`<b>${form.name || "Alphabet"}</b> deleted successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} deleted successfully!", { value0: form.name || "Alphabet" }), 'success', 'check', 5000)
             setForm(getEmptyForm())
             onUpdate()
             onClose()
             
         } catch (error) {
-            showAlert("Error deleting alphabet. Please try again.", "error", "alert-circle", 3000)
+            showAlert(error instanceof Error ? error.message : t("Error deleting alphabet. Please try again."), "error", "alert-circle", 3000)
             console.error("Error deleting alphabet:", error)
         }
     }
@@ -129,25 +130,25 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
     return (
         <Dialog
             open={open}
-            title="Edit Alphabet"
+            title={t("Edit Alphabet")}
             onClose={handleClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Delete",
+                            label: t("Delete"),
                             variant: "delete",
                             onClick: handleDelete
                         },
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             position: "end",
                             onClick: handleClose
                         },
                         {
-                            label: "Save",
+                            label: t("Save"),
                             variant: "success",
                             position: "end",
                             onClick: handleSubmit
@@ -157,8 +158,8 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
             }
         >
             <DialogOption
-                title="Alphabet Name"
-                description="Enter a name for this alphabet"
+                title={t("Alphabet Name")}
+                description={t("Enter a name for this alphabet")}
                 layout="row"
             >
                 <Input
@@ -166,7 +167,7 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
                     name="alphabet-name"
                     type="text"
                     value={form.name}
-                    placeholder="My Alphabet"
+                    placeholder={t("My Alphabet")}
                     onChange={(event: any) => {
                         handleChange('name', event.target.value)
                     }}
@@ -175,8 +176,8 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Description"
-                description="Optional description for this alphabet"
+                title={t("Description")}
+                description={t("Optional description for this alphabet")}
                 layout="col"
             >
                 <textarea
@@ -184,7 +185,7 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
                     name="alphabet-description"
                     value={form.description}
                     rows={3}
-                    placeholder="Describe this alphabet"
+                    placeholder={t("Describe this alphabet")}
                     onChange={(event: any) => {
                         handleChange('description', event.target.value)
                     }}
@@ -193,8 +194,8 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Identifier"
-                description="Unique identifier for this alphabet"
+                title={t("Identifier")}
+                description={t("Unique identifier for this alphabet")}
                 layout="row"
             >
                 <Input
@@ -202,7 +203,7 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
                     name="alphabet-identifier"
                     type="text"
                     value={form.identifier}
-                    placeholder="my-alphabet"
+                    placeholder={t("my-alphabet")}
                     onChange={(event: any) => {
                         handleChange('identifier', event.target.value)
                     }}
@@ -211,8 +212,8 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Icon"
-                description="Select an icon for this alphabet"
+                title={t("Icon")}
+                description={t("Select an icon for this alphabet")}
                 layout="row"
             >
                 <IconSelector
@@ -224,8 +225,8 @@ const EditAlphabetModal = (props: EditAlphabetModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Characters"
-                description="The character set for this alphabet"
+                title={t("Characters")}
+                description={t("The character set for this alphabet")}
                 layout="col"
             >
                 <textarea

@@ -4,10 +4,11 @@ import Layout from "@layout/home.layout.astro"
 
 import Home from "@component/page/index"
 import Background from "@component/global/background"
+import Company from "@component/company"
 
 ---
 
 <Layout>
 	<Background client:load />
-	<Home client:load />
+	{Astro.locals.companyUser ? <Company user={Astro.locals.companyUser} client:load /> : <Home client:load />}
 </Layout>

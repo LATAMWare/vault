@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useState } from "react"
 
 import { createVault } from "@logic/vault"
@@ -35,7 +36,7 @@ const CreateVaultModal = (props: CreateVaultModalProps) => {
     const handleCreateSubmit = () => {
 
         if (!vaultForm.name.trim()) {
-            return showAlert("Please fill in the vault name.", "error", "alert-circle", 3000)
+            return showAlert(t("Please fill in the vault name."), "error", "alert-circle", 3000)
         }
 
         try {
@@ -46,14 +47,14 @@ const CreateVaultModal = (props: CreateVaultModalProps) => {
                 vaultIcon: vaultForm.icon
             })
 
-            showAlert(`<b>${vaultForm.name}</b> vault created successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} vault created successfully!", { value0: vaultForm.name }), 'success', 'check', 5000)
             
             setVaultForm(getEmptyVaultForm())
             onCreate()
             handleClose()
 
         } catch (error) {
-            showAlert("Error creating vault. Please try again.", "error", "alert-circle", 3000)
+            showAlert(t("Error creating vault. Please try again."), "error", "alert-circle", 3000)
             console.error("Error creating vault:", error)
         }
     }
@@ -61,20 +62,20 @@ const CreateVaultModal = (props: CreateVaultModalProps) => {
     return (
         <Dialog
             open={open}
-            title="Create New Vault"
+            title={t("Create New Vault")}
             onClose={handleClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             position: "start",
                             onClick: handleClose
                         },
                         {
-                            label: "Create",
+                            label: t("Create"),
                             variant: "success",
                             position: "end",
                             onClick: handleCreateSubmit
@@ -84,8 +85,8 @@ const CreateVaultModal = (props: CreateVaultModalProps) => {
             }
         >
             <DialogOption
-                title="Vault Name"
-                description="Choose a name for your new vault"
+                title={t("Vault Name")}
+                description={t("Choose a name for your new vault")}
                 layout="row"
             >
                 <Input
@@ -93,7 +94,7 @@ const CreateVaultModal = (props: CreateVaultModalProps) => {
                     name="vault-name"
                     type="text"
                     value={vaultForm.name}
-                    placeholder="e.g. My Personal Vault"
+                    placeholder={t("e.g. My Personal Vault")}
                     onChange={(event: any) => {
                         setVaultForm({ ...vaultForm, name: event.target.value })
                     }}
@@ -102,8 +103,8 @@ const CreateVaultModal = (props: CreateVaultModalProps) => {
             </DialogOption>
 
             <DialogOption
-                title="Vault Icon"
-                description="Select an icon for your vault"
+                title={t("Vault Icon")}
+                description={t("Select an icon for your vault")}
                 layout="row"
             >
                 <IconSelector

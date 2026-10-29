@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
 import { APP_VERSION, checkForUpdate, getAvailableUpdate } from "@logic/version"
@@ -34,26 +35,22 @@ const Version = ({ detailed = false, accountId = "" }: VersionProps) => {
     if (detailed) return (
         <div className="container">
             <div>
-                <div className="description">
-                    Current version: <span className="font-inter-bold text-white">v{ APP_VERSION }</span>
+                <div className="description"> {t("Current version:")} <span className="font-inter-bold text-white">{t("v")}{ APP_VERSION }</span>
                 </div>
             </div>
             <div className="option text-left md:text-right">
                 { isChecking ? (
-                    <span className="text-white/50">Checking for updates...</span>
+                    <span className="text-white/50">{t("Checking for updates...")}</span>
                 ) : availableUpdate ? (
                     <a
-                        href="https://github.com/sizoLabs/vault/releases/latest"
+                        href="https://github.com/LATAMWare/vault/releases/latest"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:text-white duration-300 font-inter-bold"
-                    >
-                        Update available: v{ availableUpdate }
+                    > {t("Update available: v")}{ availableUpdate }
                     </a>
                 ) : (
-                    <span className="text-white/50">
-                        Vault is up to date.
-                    </span>
+                    <span className="text-white/50"> {t("Vault is up to date.")} </span>
                 ) }
             </div>
         </div>
@@ -63,14 +60,13 @@ const Version = ({ detailed = false, accountId = "" }: VersionProps) => {
         <>
             <div className="absolute z-80 top-0 right-0 w-fit px-3 pt-3 flex flex-row items-center justify-center gap-1 md:gap-2">
                 <a
-                    href="https://github.com/sizoLabs/vault"
+                    href="https://github.com/LATAMWare/vault"
                     target="_blank"
                     className="inline-block text-white/20 hover:text-white duration-300 text-2xl align-middle"
                 >
                     <i className="ti ti-brand-github" />
                 </a>
-                <div className="inline-block align-middle text-white/30 text-xs bg-black/5 border border-white/10 hover:bg-primary/10 hover:border-primary hover:text-primary duration-300 squircle-md px-2 py-1 -mt-0.5">
-                    v{ APP_VERSION }
+                <div className="inline-block align-middle text-white/30 text-xs bg-black/5 border border-white/10 hover:bg-primary/10 hover:border-primary hover:text-primary duration-300 squircle-md px-2 py-1 -mt-0.5"> {t("v")}{ APP_VERSION }
                 </div>
             </div>
         </>

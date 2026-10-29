@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
 import { getVaultCount } from "@logic/vault"
@@ -7,9 +8,7 @@ import { getAlphabetCount } from "@logic/alphabet"
 import { applyThemeColor } from "@logic/settings"
 
 import Logo from "../../ui/global/logo"
-import Lite from "@component/global/lite"
 import Block from "@component/ui/main/block"
-import Footer from "@component/global/footer"
 import Version from "@component/sections/settings/version"
 
 interface HomeProps {
@@ -19,7 +18,7 @@ interface HomeProps {
 
 const Home = (props: HomeProps) => {
 
-    const { accountId, onSectionChange } = props
+    const { accountId } = props
     const [ totalVaults, setTotalVaults ] = useState(0)
     const [ totalServices, setTotalServices ] = useState(0)
     const [ totalSecrets, setTotalSecrets ] = useState(0)
@@ -86,33 +85,24 @@ const Home = (props: HomeProps) => {
             <div className="absolute inset-0 overflow-y-scroll no-scrollbar-but-scroll">
 
                 <div className="z-50 mx-auto flex min-h-full w-full max-w-full flex-col items-center justify-center p-5 md:max-w-300">
-
-                    <Lite />
                     
                     <Logo />
 
-                    <div className="text-2xl md:text-4xl text-center mb-3">
-                        The world's <b className="font-inter-black">most secure</b> Password Manager
-                    </div>
-
-                    <div className="text-xl md:text-[26px] text-center text-white/60 mb-15">
-                        Serverless, self-hosted, open source and <b className="text-primary">free forever</b>.
+                    <div className="text-2xl md:text-4xl text-center mb-10"> {t("Local password manager for")} <b className="font-inter-black">LATAMWare</b>
                     </div>
 
                     <div className="flex flex-row flex-wrap justify-center intems-center gap-2 md:gap-5 w-full">
 
-                        <Block value={ totalVaults } label={ (totalVaults > 1) ? "Vaults" : (totalVaults === 0) ? "Vaults" : "Vault" } />
-                        <Block value={ totalServices } label="Services" />
-                        <Block value={ totalSecrets } label="Secrets" />
-                        <Block value={ totalAlphabets } label="Alphabets" />
+                        <Block value={ totalVaults } label={ (totalVaults > 1) ? t("Vaults") : (totalVaults === 0) ? t("Vaults") : t("Vault") } />
+                        <Block value={ totalServices } label={t("Services")} />
+                        <Block value={ totalSecrets } label={t("Secrets")} />
+                        <Block value={ totalAlphabets } label={t("Alphabets")} />
 
                     </div>
 
                 </div>
 
             </div>
-
-            <Footer onSectionChange={ onSectionChange } />
 
         </div>
     )

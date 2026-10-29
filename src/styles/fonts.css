@@ -19,15 +19,9 @@
 	src: url('/fonts/inter/Inter-Medium.ttf') format("truetype");
 }
 
-@font-face {
-	font-family: "Inter Thin";
-	src: url('/fonts/inter/Inter-Thin.ttf') format("truetype");
-}
 
-@font-face {
-	font-family: "Inter Light";
-	src: url('/fonts/inter/Inter-Light.ttf') format("truetype");
-}
+
+
 
 @font-face {
 	font-family: "Inter Black";
@@ -37,14 +31,4 @@
 @font-face {
 	font-family: "Inter Bold";
 	src: url('/fonts/inter/Inter-Bold.ttf') format("truetype");
-}
-
-@font-face {
-	font-family: "Inter ExtraBold";
-	src: url('/fonts/inter/Inter-ExtraBold.ttf') format("truetype");
-}
-
-@font-face {
-	font-family: "Inter SemiBold";
-	src: url('/fonts/inter/Inter-SemiBold.ttf') format("truetype");
 }

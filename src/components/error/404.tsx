@@ -1,4 +1,9 @@
+import { useEffect } from "react"
+import { useI18n, detectLanguage, setLanguage } from "@logic/i18n"
 const Error = () => {
+    const { t, language } = useI18n()
+    useEffect(() => { void setLanguage(detectLanguage(), false) }, [])
+    useEffect(() => { document.title = t("Error 404 — Page Not Found") }, [language])
 
     return (
         <>
@@ -18,24 +23,16 @@ const Error = () => {
                                         VAULT <i className="ti ti-vault ml-1 align-bottom inline-block -mt-2 text-white text-[50px] md:text-[50px] lg:text-[95px]"></i>
                                     </h1>
 
-                                    <h2 className="text-lg md:text-3xl text-white/70 font-inter-medium mb-8">
-                                        Error 404 — Page Not Found
-                                    </h2>
+                                    <h2 className="text-lg md:text-3xl text-white/70 font-inter-medium mb-8"> {t("Error 404 — Page Not Found")} </h2>
 
-                                    <h2 className="text-2xl md:text-5xl font-inter-bold mb-2">
-                                        Ops, something went wrong...
-                                    </h2>
+                                    <h2 className="text-2xl md:text-5xl font-inter-bold mb-2"> {t("Ops, something went wrong...")} </h2>
 
-                                    <p className="text-lg md:text-2xl text-white/70 mb-15">
-                                        We don't know what you wanted to see, but it's not here.
-                                    </p>
+                                    <p className="text-lg md:text-2xl text-white/70 mb-15"> {t("We don't know what you wanted to see, but it's not here.")} </p>
 
                                     <a
                                         href="/"
                                         className="h-fit text-md md:text-lg font-inter-bold squircle-md px-3 md:px-8 py-3 md:py-5 border text-left cursor-pointer duration-300 hover:bg-primary/10 hover:border-primary/50 hover:text-white bg-white/5 border-white/10"
-                                    >
-                                        Back to VAULT
-                                    </a>
+                                    > {t("Back to VAULT")} </a>
 
                                 </div>
 

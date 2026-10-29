@@ -27,12 +27,13 @@ const SecretCard = ({
 
     const handleCopyPassword = async () => {
 
-        copySecretToClipboard({
+        const copied = await copySecretToClipboard({
             accountId,
             masterPassword,
             secretId: secret.id
         })
 
+        if (!copied) return
         setIsCopied(true)
 
         setTimeout(() => {

@@ -1,5 +1,7 @@
-import { getStorage, setStorage } from "@logic/storage"
+import { t } from "@logic/i18n"
+import { getStorage, setStorage, mutateAccount } from "@logic/storage"
 import { showAlert } from "@logic/alert"
+import { assertAccountPassword } from "@logic/master"
 import { generateId, encodeData, decodeData, copyToClipboard } from "@logic/utils"
 import { type ISecret } from "@interface/index"
 
@@ -37,7 +39,7 @@ export const getAllSecretList = (accountId: string) => {
     return secrets
 }
 
-export const getSecretList = ({ accountId, vaultId, masterPassword }: { accountId: string, vaultId: string, masterPassword?: string }): any => {
+export const getSecretList = ({ accountId, vaultId }: { accountId: string, vaultId: string, masterPassword?: string }): any => {
 
     let account = getStorage(accountId)
     const secrets = account.secrets
@@ -97,97 +99,32 @@ export const reorderSecret = ({ accountId, vaultId, secretId, direction }: { acc
     setStorage(accountId, { ...account, secrets })
 }
 
-export const createSecret = async ({
-    accountId,
-    name,
-    content,
-    description,
-    icon,
-    vault,
-    masterPassword
-}: {
-    accountId: string,
-    name: string,
-    content: string,
-    description: string,
-    icon: string,
-    vault: string,
-    masterPassword: string
-}) => {
-
-    let account = getStorage(accountId)
-    let secrets = account.secrets
-
-    if(!secrets) secrets = [] as ISecret[]
-
-    const encryptedContent = content ? await encodeData(masterPassword, content) : ""
-    const encryptedDescription = description ? await encodeData(masterPassword, description) : ""
-
-    const newSecret: ISecret = {
-        id: generateId(),
-        name: name,
-        content: encryptedContent,
-        description: encryptedDescription,
-        icon: icon,
-        vault: vault
+export const createSecret = async (input: {
+    accountId: string, name: string, content: string, description: string, icon: string, vault: string, masterPassword: string
+}) => mutateAccount(input.accountId, async (account) => {
+    await assertAccountPassword(input.accountId, input.masterPassword)
+    if (!input.content || !account.vaults?.some((v: any) => v.id === input.vault)) throw new Error(t("Enter content and select a valid vault"))
+    const secret: ISecret = {
+        id: generateId(), name: input.name, icon: input.icon, vault: input.vault,
+        content: await encodeData(input.masterPassword, input.content),
+        description: input.description ? await encodeData(input.masterPassword, input.description) : ""
     }
+    return { account: { ...account, secrets: [...(account.secrets ?? []), secret] }, result: secret.id }
+})
 
-    secrets.push(newSecret)
-
-    account = {
-        ...account,
-        secrets: secrets
+export const updateSecret = async (input: {
+    accountId: string, secretId: string, name: string, content: string, description: string, icon: string, vault: string, masterPassword: string
+}) => mutateAccount(input.accountId, async (account) => {
+    await assertAccountPassword(input.accountId, input.masterPassword)
+    if (!account.secrets?.some((secret: ISecret) => secret.id === input.secretId)) throw new Error(t("Secret no longer exists"))
+    if (!input.content || !account.vaults?.some((v: any) => v.id === input.vault)) throw new Error(t("Enter content and select a valid vault"))
+    const next: ISecret = {
+        id: input.secretId, name: input.name, icon: input.icon, vault: input.vault,
+        content: await encodeData(input.masterPassword, input.content),
+        description: input.description ? await encodeData(input.masterPassword, input.description) : ""
     }
-
-    setStorage(accountId, account)
-    
-}
-
-export const updateSecret = async ({
-    accountId,
-    secretId,
-    name,
-    content,
-    description,
-    icon,
-    vault,
-    masterPassword
-}: {
-    accountId: string,
-    secretId: string,
-    name: string,
-    content: string,
-    icon: string,
-    description: string,
-    vault: string,
-    masterPassword: string
-}) => {
-
-    let account = getStorage(accountId)
-    let secrets = account.secrets
-
-    const encryptedContent = content ? await encodeData(masterPassword, content) : ""
-    const encryptedDescription = description ? await encodeData(masterPassword, description) : ""
-
-    for (let index = 0; index < secrets.length; index++) {
-        if(secrets[index].id === secretId) {
-            secrets[index].name = name === "" ? "" : name
-            secrets[index].content = encryptedContent
-            secrets[index].description = encryptedDescription
-            secrets[index].icon = icon
-            secrets[index].vault = vault
-            break
-        }
-    }
-
-    account = {
-        ...account,
-        secrets: secrets
-    }
-
-    setStorage(accountId, account)
-    
-}
+    return { account: { ...account, secrets: account.secrets.map((secret: ISecret) => secret.id === next.id ? next : secret) }, result: undefined }
+})
 
 export const deleteSecret = ({ accountId, secretId }: { accountId: string, secretId: string }) => {
 
@@ -226,33 +163,30 @@ export const copySecretToClipboard = async ({
         const secret = getSecret({ accountId, secretId })
 
         if(!secret) {
-            showAlert('Secret not found', 'error', 'alert-circle', 3000)
-            return
+            showAlert(t("Secret not found"), 'error', 'alert-circle', 3000)
+            return false
         }
 
         const secretContent = await decodeData(masterPassword, secret.content)
 
-        copyToClipboard(secretContent)
+        await copyToClipboard(secretContent)
         
         showAlert(
-            `<b>${ secret.name === "" ? "Secret" : secret.name }</b> copied to clipboard!`,
+            t("{{value0}} copied to clipboard!", { value0: secret.name === "" ? t("Secret") : secret.name }),
             'success',
             'check', 
             3000
         )
+        return true
 
     } catch (error) {
-        showAlert('Error copying secret', 'error', 'alert-circle', 3000)
+        showAlert(t("Error copying secret"), 'error', 'alert-circle', 3000)
+        return false
     }
 
 }
 
 export const getSecretContent = async (data: string, masterPassword: string) => {
     if (!data || typeof data !== 'string' || data.trim() === '') return ""
-    try {
-        return await decodeData(masterPassword, data)
-    } catch (error) {
-        console.error('Error decoding secret content:', error)
-        return ""
-    }
+    return decodeData(masterPassword, data)
 }

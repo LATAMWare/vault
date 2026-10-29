@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { t } from "@logic/i18n"
+import { useEffect, useState, useRef } from "react"
 
 import { getAlphabetList, getAlphabet } from "@logic/alphabet"
-import { updateService, deleteService, getServiceDescription } from "@logic/service"
-import { genServicePassword, copyToClipboard } from "@logic/utils"
+import { updateService, deleteService, getServiceDescription, getServicePassword } from "@logic/service"
+import { CURRENT_PASSWORD_ALGORITHM, copyToClipboard } from "@logic/utils"
 import { getStorage } from "@logic/storage"
 import { getVaultList } from "@logic/vault"
 import { getSetting } from "@logic/settings"
@@ -93,11 +94,16 @@ const ServiceModal = (props: ServiceModalProps) => {
         setShowServicePassword(accountShowPasswords)
     }
 
+    const saving = useRef(false)
+
     const handleSubmit = async (event: any) => {
 
         event.preventDefault()
+        if (saving.current) return
+        saving.current = true
+        try {
 
-        if(!form.identifier) return showAlert("Please fill in the required fields: Identifier", "error", "alert-circle", 3000)
+        if(!form.identifier) return showAlert(t("Please fill in the required fields: Identifier"), "error", "alert-circle", 3000)
 
         await updateService({
             accountId,
@@ -114,11 +120,14 @@ const ServiceModal = (props: ServiceModalProps) => {
             masterPassword: masterPassword
         })
 
-        showAlert(`<b>${form.name || "Service"}</b> updated successfully!`, 'success', 'check', 5000)
+        showAlert(t("{{value0}} updated successfully!", { value0: form.name || t("Service") }), 'success', 'check', 5000)
         
         onUpdate()
         onClose()
 
+        } catch (error) {
+            showAlert(error instanceof Error ? error.message : t("Could not save. Please retry."), "error", "alert-circle", 5000)
+        } finally { saving.current = false }
     }
 
     const handleClose = () => {
@@ -128,7 +137,7 @@ const ServiceModal = (props: ServiceModalProps) => {
     const handleDelete = () => {
         if (!serviceId) return
 
-        const confirmation = confirm("Are you sure you want to delete this service? This action cannot be undone.")
+        const confirmation = confirm(t("Are you sure you want to delete this service? This action cannot be undone."))
         if (!confirmation) return
 
         deleteService({
@@ -136,14 +145,17 @@ const ServiceModal = (props: ServiceModalProps) => {
             serviceId
         })
 
-        showAlert(`<b>${form.name || "Service"}</b> deleted successfully!`, 'success', 'check', 5000)
+        showAlert(t("{{value0}} deleted successfully!", { value0: form.name || t("Service") }), 'success', 'check', 5000)
 
         onUpdate()
         onClose()
     }
 
-    const generatePassword = async (alphabetId: string, length: number, identifier: string, version?: number) => {
-        if (!alphabetId || !identifier) {
+    const previewRequest = useRef(0)
+    const generatePassword = async (alphabetId: string, length: number, identifier: string, version = 1, source: IService = service) => {
+
+        const request = ++previewRequest.current
+        if (!alphabetId || !identifier || !Number.isInteger(length) || length < 1 || length > 1024 || !Number.isInteger(version) || version < 1 || version > 999) {
             setPassword('')
             return
         }
@@ -155,15 +167,16 @@ const ServiceModal = (props: ServiceModalProps) => {
             return
         }
 
-        const password = await genServicePassword(masterPassword, identifier, length, {
-            identifier: alphabet.identifier,
-            characters: alphabet.characters
-        }, version)
-        setPassword(password)
+        const changed = source.identifier !== identifier || source.alphabet !== alphabetId || source.length !== length || (source.version ?? 1) !== version
+        const password = await getServicePassword(masterPassword, {
+            ...source, identifier, alphabet: alphabetId, length, version,
+            ...(changed ? { password: undefined, algorithm: CURRENT_PASSWORD_ALGORITHM } : {})
+        }, alphabet)
+        if (request === previewRequest.current) setPassword(password)
     }
 
     const copyServicePassword = async () => {
-        copyToClipboard(password)
+        await copyToClipboard(password)
         setPasswordCopied(true)
         setTimeout(() => {
             setPasswordCopied(false)
@@ -191,7 +204,7 @@ const ServiceModal = (props: ServiceModalProps) => {
                 identifier: service.identifier,
                 alphabet: resolvedAlphabetId,
                 length: service.length,
-                version: service.version,
+                version: service.version ?? 1,
                 url: service.url
             }
 
@@ -199,7 +212,7 @@ const ServiceModal = (props: ServiceModalProps) => {
             setForm(nextForm)
             setPassword('')
             setShowServicePassword(accountShowPasswords)
-            generatePassword(resolvedAlphabetId, service.length, service.identifier, service.version)
+            generatePassword(resolvedAlphabetId, service.length, service.identifier, service.version, service)
             return
         }
 
@@ -208,7 +221,11 @@ const ServiceModal = (props: ServiceModalProps) => {
     }
 
     useEffect(() => {
-        getServiceData()
+        getServiceData().catch(() => {
+            resetServiceState()
+            showAlert(t("Could not decrypt this service. Unlock the account again or restore a verified backup."), "error", "alert-circle", 5000)
+            onClose()
+        })
     }, [ accountId, serviceId ])
 
     if(!serviceId) return null
@@ -216,25 +233,25 @@ const ServiceModal = (props: ServiceModalProps) => {
     return (
         <Dialog
             open={open}
-            title={ service.name || "Service" }
+            title={ service.name || t("Service") }
             onClose={onClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Delete",
+                            label: t("Delete"),
                             variant: "delete",
                             onClick: handleDelete
                         },
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             position: "end",
                             onClick: handleClose
                         },
                         {
-                            label: "Save",
+                            label: t("Save"),
                             variant: "success",
                             position: "end",
                             onClick: () => handleSubmit({ preventDefault: () => {} } as any)
@@ -243,9 +260,12 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             }
         >
+            { !service.algorithm && !service.password && (
+                <p className="p-4 text-sm text-amber-300">{t("This service uses legacy password generation. Increase its rotation version to use the stronger generator, then update the password at the external service.")}</p>
+            ) }
             <DialogOption
-                title="Service Name"
-                description="The name of the service"
+                title={t("Service Name")}
+                description={t("The name of the service")}
                 layout="row"
             >
                 <Input
@@ -253,7 +273,7 @@ const ServiceModal = (props: ServiceModalProps) => {
                     name="name"
                     type="text"
                     value={ form.name }
-                    placeholder="e.g. Example Service"
+                    placeholder={t("e.g. Example Service")}
                     onChange={ (event: any) => {
                         setForm({ ...form, name: event.target.value });
                     }}
@@ -261,8 +281,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Description"
-                description="Additional details about this service. Account, Email..."
+                title={t("Description")}
+                description={t("Additional details about this service. Account, Email...")}
                 layout="col"
             >
                 <textarea
@@ -276,8 +296,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="URL" 
-                description="The URL of the service. Used to open the service in a new tab."
+                title={t("URL")}
+                description={t("The URL of the service. Used to open the service in a new tab.")}
                 layout="row"
                 className="md:min-w-70"
             >
@@ -285,14 +305,14 @@ const ServiceModal = (props: ServiceModalProps) => {
                     id="url"
                     type="url"
                     value={ form.url }
-                    placeholder="e.g. https://example.com"
+                    placeholder={t("e.g. https://example.com")}
                     onChange={ (event: any) => setForm({ ...form, url: event.target.value }) }
                     className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md"
                 />
             </DialogOption>
             <DialogOption
-                title="Identifier"
-                description="Unique identifier used to generate the password"
+                title={t("Identifier")}
+                description={t("Unique identifier used to generate the password")}
                 layout="row"
                 className="md:min-w-70"
             >
@@ -301,7 +321,7 @@ const ServiceModal = (props: ServiceModalProps) => {
                     id="identifier"
                     type="text"
                     value={ form.identifier }
-                    placeholder="e.g. service.com"
+                    placeholder={t("e.g. service.com")}
                     onChange={ (event: any) => {
                         const newIdentifier = event.target.value;
                         const newForm = {...form, identifier: newIdentifier };
@@ -312,8 +332,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Vault"
-                description="Move this service to another vault"
+                title={t("Vault")}
+                description={t("Move this service to another vault")}
                 layout="row"
                 className="md:min-w-70"
             >
@@ -328,8 +348,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Icon"
-                description="Icon for the service."
+                title={t("Icon")}
+                description={t("Icon for the service.")}
                 layout="row"
                 className="w-full md:min-w-70"
             >
@@ -342,8 +362,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Alphabet"
-                description="Character set used to generate the password"
+                title={t("Alphabet")}
+                description={t("Character set used to generate the password")}
                 layout="row"
                 className="md:min-w-70"
             >
@@ -361,8 +381,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Password Length"
-                description="Length of the generated password"
+                title={t("Password Length")}
+                description={t("Length of the generated password")}
                 layout="row"
             >
                 <Input
@@ -380,8 +400,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Password Version"
-                description="Increment this to generate a new password for the same service."
+                title={t("Password Version")}
+                description={t("Increment this to generate a new password for the same service.")}
                 layout="row"
             >
                 <Input
@@ -401,8 +421,8 @@ const ServiceModal = (props: ServiceModalProps) => {
                 />
             </DialogOption>
             <DialogOption
-                title="Password"
-                description="Generated password for this service"
+                title={t("Password")}
+                description={t("Generated password for this service")}
                 layout="col"
                 className="pb-0"
             >
@@ -411,7 +431,7 @@ const ServiceModal = (props: ServiceModalProps) => {
                         <div
                             onClick={ copyServicePassword }
                             className={ `relative z-10 min-w-25 block font-inter-medium max-h-13 overflow-hidden w-full px-4 py-3 pr-15 border duration-300 bg-white/5 border-white/20 cursor-pointer focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md text-xl ${passwordCopied ? 'hover:text-emerald-500! text-emerald-500 border-emerald-500! bg-emerald-500/10!' : ''}` }
-                            aria-label="Copy Password"
+                            aria-label={t("Copy Password")}
                         >
                             { shouldDisplayPassword ? password : maskedPassword }
                         </div>
@@ -419,13 +439,13 @@ const ServiceModal = (props: ServiceModalProps) => {
                             type="button"
                             onClick={ () => setShowServicePassword((currentValue) => !currentValue) }
                             className="absolute right-3 z-20 cursor-pointer h-fit px-2 pt-1.5 pb-0.5 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white text-white/50 squircle-md font-inter-medium text-sm backdrop-blur-xl"
-                            aria-label={ shouldDisplayPassword ? "Hide password" : "Show password" }
+                            aria-label={ shouldDisplayPassword ? t("Hide password") : t("Show password") }
                         >
                             <i className={ `ti ${shouldDisplayPassword ? "ti-eye-off" : "ti-eye"} text-2xl` } />
                         </button>
                     </div>
                     <div className={ `mt-4 text-sm ${passwordCopied ? 'text-emerald-500 font-inter-bold' : 'text-white/50'}` }>
-                        { passwordCopied ? "Password copied to clipboard!" : "Click the password to copy it." }
+                        { passwordCopied ? t("Password copied to clipboard!") : t("Click the password to copy it.") }
                     </div>
                 </div>
             </DialogOption>

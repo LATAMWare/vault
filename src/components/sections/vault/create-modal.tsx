@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react"
+import { t } from "@logic/i18n"
+import { useEffect, useState, useRef } from "react"
 
 import { getAlphabetList, getAlphabet } from "@logic/alphabet"
 import { createService, getServiceCountInVault } from "@logic/service"
 import { createSecret, getSecretCountInVault } from "@logic/secret"
-import { genServicePassword, copyToClipboard, generateId } from "@logic/utils"
+import { genServicePassword, copyToClipboard, generateId, CURRENT_PASSWORD_ALGORITHM } from "@logic/utils"
 import { getVaultList } from "@logic/vault"
 import { getSetting } from "@logic/settings"
 import { showAlert } from "@logic/alert"
@@ -44,7 +45,7 @@ const CreateModal = (props: CreateModalProps) => {
         const generatedIdentifier = `service-${totalServices + 1}-${generateId().slice(0, 12)}`
 
         return {
-            name: 'Service #' + (totalServices + 1),
+            name: t('Service #') + (totalServices + 1),
             vault: '',
             icon: 'password-user',
             description: '',
@@ -61,7 +62,7 @@ const CreateModal = (props: CreateModalProps) => {
         const totalSecrets = getSecretCountInVault(accountId, vaultId)
 
         return {
-            name: 'Secret #' + (totalSecrets + 1),
+            name: t('Secret #') + (totalSecrets + 1),
             vault: '',
             description: '',
             icon: 'password-fingerprint',
@@ -108,13 +109,18 @@ const CreateModal = (props: CreateModalProps) => {
         }
     }, [ open, accountId ])
 
+    const saving = useRef(false)
+
     const handleCreateSubmit = async (event: any) => {
 
         event.preventDefault()
+        if (saving.current) return
+        saving.current = true
+        try {
 
         if (mode === "service") {
 
-            if (!serviceForm.identifier.trim()) return showAlert("Please fill in the required fields: Name and Identifier.", "error", "alert-circle", 3000)
+            if (!serviceForm.identifier.trim()) return showAlert(t("Please fill in the required fields: Name and Identifier."), "error", "alert-circle", 3000)
 
             await createService({
                 accountId,
@@ -129,40 +135,45 @@ const CreateModal = (props: CreateModalProps) => {
                 masterPassword: masterPassword
             })
 
-            showAlert(`<b>${serviceForm.name}</b> created successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} created successfully!", { value0: serviceForm.name }), 'success', 'check', 5000)
 
         }
 
         if (mode === "secret") {
 
-            if (!secretForm.content.trim()) return showAlert("Please fill in the required fields: Name and Content.", "error", "alert-circle", 3000)
+            if (!secretForm.content) return showAlert(t("Please fill in the required fields: Name and Content."), "error", "alert-circle", 3000)
 
             await createSecret({
                 accountId,
                 name: secretForm.name.trim(),
                 description: secretForm.description.trim(),
                 icon: secretForm.icon,
-                content: secretForm.content.trim(),
+                content: secretForm.content,
                 vault: secretForm.vault || vaultId,
                 masterPassword: masterPassword
             })
 
-            showAlert(`<b>${secretForm.name}</b> created successfully!`, 'success', 'check', 5000)
+            showAlert(t("{{value0}} created successfully!", { value0: secretForm.name }), 'success', 'check', 5000)
 
         }
         
         onCreate()
         onClose()
 
+        } catch (error) {
+            showAlert(error instanceof Error ? error.message : t("Could not save. Please retry."), "error", "alert-circle", 5000)
+        } finally { saving.current = false }
     }
 
     const handleClose = () => {
         onClose()
     }
 
+    const previewRequest = useRef(0)
     const generatePassword = async (alphabetId: string, length: number, identifier: string, version?: number) => {
-        
-        if (!alphabetId || !identifier) {
+
+        const request = ++previewRequest.current
+        if (!alphabetId || !identifier.trim() || !Number.isInteger(length) || length < 1 || length > 1024) {
             setPassword('')
             return
         }
@@ -174,17 +185,17 @@ const CreateModal = (props: CreateModalProps) => {
             return
         }
 
-        const password = await genServicePassword(masterPassword, identifier, length, {
+        const password = await genServicePassword(masterPassword, identifier.trim(), length, {
             identifier: alphabet.identifier,
             characters: alphabet.characters
-        }, version)
+        }, version, CURRENT_PASSWORD_ALGORITHM)
 
-        setPassword(password)
+        if (request === previewRequest.current) setPassword(password)
 
     }
 
     const copyServicePassword = async () => {
-        copyToClipboard(password)
+        await copyToClipboard(password)
         setPasswordCopied(true)
         setTimeout(() => {
             setPasswordCopied(false)
@@ -194,20 +205,20 @@ const CreateModal = (props: CreateModalProps) => {
     return (
         <Dialog
             open={open}
-            title={ mode === "service" ? "Create New Service" : "Create New Secret" }
+            title={ mode === "service" ? t("Create New Service") : t("Create New Secret") }
             onClose={onClose}
             contentClassName="flex flex-col"
             footer={
                 <DialogFooter
                     buttons={[
                         {
-                            label: "Cancel",
+                            label: t("Cancel"),
                             variant: "cancel",
                             position: "start",
                             onClick: handleClose
                         },
                         {
-                            label: "Create",
+                            label: t("Create"),
                             variant: "success",
                             position: "end",
                             onClick: () => handleCreateSubmit({ preventDefault: () => {} } as any)
@@ -219,8 +230,8 @@ const CreateModal = (props: CreateModalProps) => {
             <div className="sticky h-13 md:h-17 top-16.25 overflow-hidden md:top-17.25 z-20 border-b border-white/10 bg-white/2 px-2 pt-2 backdrop-blur-xl inset-shadow-bottom">
                 <div className="flex gap-2 w-full">
                     {([
-                        { id: "service", label: "Service", icon: "ti ti-password-user" },
-                        { id: "secret", label: "Secret", icon: "ti ti-password-fingerprint" }
+                        { id: "service", label: t("Service"), icon: "ti ti-password-user" },
+                        { id: "secret", label: t("Secret"), icon: "ti ti-password-fingerprint" }
                     ] as const).map((tab) => (
                         <button
                             key={tab.id}
@@ -238,8 +249,8 @@ const CreateModal = (props: CreateModalProps) => {
             {mode === "service" ? (
                 <>
                     <DialogOption
-                        title="Service Name"
-                        description="The name of the service"
+                        title={t("Service Name")}
+                        description={t("The name of the service")}
                         layout="row"
                     >
                         <Input
@@ -247,7 +258,7 @@ const CreateModal = (props: CreateModalProps) => {
                             name="name"
                             type="text"
                             value={ serviceForm.name }
-                            placeholder="e.g. Example Service"
+                            placeholder={t("e.g. Example Service")}
                             onChange={ (event: any) => {
                                 setServiceForm({ ...serviceForm, name: event.target.value });
                             }}
@@ -255,8 +266,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Details"
-                        description="Additional details about this service. E.g. username, email..."
+                        title={t("Details")}
+                        description={t("Additional details about this service. E.g. username, email...")}
                         layout="col"
                     >
                         <textarea
@@ -270,8 +281,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="URL"
-                        description="The URL of the service. Used to open the service in a new tab"
+                        title={t("URL")}
+                        description={t("The URL of the service. Used to open the service in a new tab")}
                         layout="row"
                         className="md:min-w-70"
                     >
@@ -279,14 +290,14 @@ const CreateModal = (props: CreateModalProps) => {
                             id="url"
                             type="url"
                             value={ serviceForm.url }
-                            placeholder="e.g. https://example.com"
+                            placeholder={t("e.g. https://example.com")}
                             onChange={ (event: any) => setServiceForm({ ...serviceForm, url: event.target.value }) }
                             className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md"
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Identifier"
-                        description="Unique identifier used to generate the password"
+                        title={t("Identifier")}
+                        description={t("Unique identifier used to generate the password")}
                         layout="row"
                         className="md:min-w-70"
                     >
@@ -295,7 +306,7 @@ const CreateModal = (props: CreateModalProps) => {
                             id="identifier"
                             type="text"
                             value={ serviceForm.identifier }
-                            placeholder="e.g. service.com"
+                            placeholder={t("e.g. service.com")}
                             onChange={ (event: any) => {
                                 const newIdentifier = event.target.value;
                                 const newForm = {...serviceForm, identifier: newIdentifier };
@@ -306,8 +317,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Vault"
-                        description="Vault where this service will be stored"
+                        title={t("Vault")}
+                        description={t("Vault where this service will be stored")}
                         layout="row"
                         className="md:min-w-70 md:w-fit"
                     >
@@ -322,8 +333,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Icon"
-                        description="Icon for the service."
+                        title={t("Icon")}
+                        description={t("Icon for the service.")}
                         layout="row"
                         className="w-full md:min-w-70"
                     >
@@ -336,8 +347,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Alphabet"
-                        description="Character set used to generate the password"
+                        title={t("Alphabet")}
+                        description={t("Character set used to generate the password")}
                         layout="row"
                         className="md:min-w-70 md:w-fit"
                     >
@@ -355,8 +366,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Password Length"
-                        description="Length of the generated password"
+                        title={t("Password Length")}
+                        description={t("Length of the generated password")}
                         layout="row"
                     >
                         <Input
@@ -374,8 +385,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Password"
-                        description="Generated password for this service"
+                        title={t("Password")}
+                        description={t("Generated password for this service")}
                         layout="col"
                         className="pb-0"
                     >
@@ -384,7 +395,7 @@ const CreateModal = (props: CreateModalProps) => {
                                 <div
                                     onClick={ copyServicePassword }
                                     className={ `relative z-10 min-w-25 block font-inter-medium max-h-13 overflow-hidden w-full px-4 py-3 pr-15 border duration-300 bg-white/5 border-white/20 cursor-pointer focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md text-xl ${passwordCopied ? 'hover:text-emerald-500! text-emerald-500 border-emerald-500! bg-emerald-500/10!' : ''}` }
-                                    aria-label="Copy Password"
+                                    aria-label={t("Copy Password")}
                                 >
                                     { shouldDisplayPassword ? password : maskedPassword }
                                 </div>
@@ -392,13 +403,13 @@ const CreateModal = (props: CreateModalProps) => {
                                     type="button"
                                     onClick={ () => setShowServicePassword((currentValue) => !currentValue) }
                                     className="absolute right-3 z-20 cursor-pointer h-fit px-2 pt-1.5 pb-0.5 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white text-white/50 squircle-md font-inter-medium text-sm backdrop-blur-xl"
-                                    aria-label={ shouldDisplayPassword ? "Hide password" : "Show password" }
+                                    aria-label={ shouldDisplayPassword ? t("Hide password") : t("Show password") }
                                 >
                                     <i className={ `ti ${shouldDisplayPassword ? "ti-eye-off" : "ti-eye"} text-2xl` } />
                                 </button>
                             </div>
                             <div className={ `mt-4 text-sm ${passwordCopied ? 'text-emerald-500 font-inter-bold' : 'text-white/50'}` }>
-                                { passwordCopied ? "Password copied to clipboard!" : "Click the password to copy it." }
+                                { passwordCopied ? t("Password copied to clipboard!") : t("Click the password to copy it.") }
                             </div>
                         </div>
                     </DialogOption>
@@ -406,8 +417,8 @@ const CreateModal = (props: CreateModalProps) => {
             ) : (
                 <>
                     <DialogOption
-                        title="Secret Name"
-                        description="The name of the secret"
+                        title={t("Secret Name")}
+                        description={t("The name of the secret")}
                         layout="row"
                     >
                         <Input
@@ -415,14 +426,14 @@ const CreateModal = (props: CreateModalProps) => {
                             name="secret-name"
                             type="text"
                             value={ secretForm.name }
-                            placeholder="e.g. API key"
+                            placeholder={t("e.g. API key")}
                             onChange={ (event: any) => setSecretForm({ ...secretForm, name: event.target.value }) }
                             className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md"
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Description"
-                        description="Additional details about this secret"
+                        title={t("Description")}
+                        description={t("Additional details about this secret")}
                         layout="col"
                     >
                         <textarea
@@ -436,8 +447,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Vault"
-                        description="Vault where this secret will be stored"
+                        title={t("Vault")}
+                        description={t("Vault where this secret will be stored")}
                         layout="row"
                         className="md:min-w-70 md:w-fit"
                     >
@@ -452,8 +463,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Icon"
-                        description="Icon for the secret"
+                        title={t("Icon")}
+                        description={t("Icon for the secret")}
                         layout="row"
                         className="w-full md:min-w-70"
                     >
@@ -466,8 +477,8 @@ const CreateModal = (props: CreateModalProps) => {
                         />
                     </DialogOption>
                     <DialogOption
-                        title="Secret Content"
-                        description="The content to store in this secret"
+                        title={t("Secret Content")}
+                        description={t("The content to store in this secret")}
                         layout="col"
                     >
                         <textarea

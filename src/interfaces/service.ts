@@ -9,4 +9,7 @@ export interface IService {
     length: number
     vault: string
     version: number
+    algorithm?: "legacy" | "pbkdf2-v2"
+    // Preserved when rotating the master password; encrypted under the new master.
+    password?: string
 }

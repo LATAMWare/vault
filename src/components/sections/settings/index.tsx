@@ -1,3 +1,4 @@
+import { t } from "@logic/i18n"
 import { useEffect, useState } from "react"
 
 import { buildMasterSeedBlocks } from "@logic/utils"
@@ -30,7 +31,6 @@ import {
     isGoogleDriveConfigured,
     pullGoogleDriveToAccount,
     pushLocalAccountToGoogleDrive,
-    setGoogleDriveState
 } from "@logic/google"
 
 import { type ISettings, type IAccountSettings } from "@interface/index"
@@ -67,7 +67,10 @@ const Settings = (props: SettingsProps) => {
 
     const onSettingChange = ({ settingId, value }: { settingId: string, value: string | number | boolean }) => {
 
-        updateSettings({ accountId, settingId, value })
+        if (!updateSettings({ accountId, settingId, value })) {
+            showAlert(t("Password length must be a whole number between 1 and 1024"), "error", "alert-circle", 3000)
+            return
+        }
 
         setAccountSettings(
             (current) => current.map(
@@ -105,7 +108,7 @@ const Settings = (props: SettingsProps) => {
     const handleResetSubmit = async () => {
 
         if (!resetMasterPassword) {
-            return showAlert("Please enter your Master Password to reset all data", 'error', 'exclamation-circle', 5000)
+            return showAlert(t("Please enter your Master Password to reset all data"), 'error', 'exclamation-circle', 5000)
         }
 
         const isValidPassword = await checkAccountMasterPassword({
@@ -114,15 +117,15 @@ const Settings = (props: SettingsProps) => {
         })
 
         if (!isValidPassword) {
-            return showAlert("Master Password is incorrect", 'error', 'exclamation-circle', 5000)
+            return showAlert(t("Master Password is incorrect"), 'error', 'exclamation-circle', 5000)
         }
 
-        const confirmation = confirm("Are you sure you want to reset all data for this account? This action cannot be undone.")
+        const confirmation = confirm(t("Are you sure you want to reset all data for this account? This action cannot be undone."))
         if (confirmation) {
             await resetAllData(accountId)
             setResetMasterPassword("")
             onAccountUpdated()
-            showAlert("All data has been reset successfully", 'success', 'check', 5000)
+            showAlert(t("All data has been reset successfully"), 'success', 'check', 5000)
         }
     }
 
@@ -148,33 +151,33 @@ const Settings = (props: SettingsProps) => {
 
     const handleDeleteCurrentAccountFromExtension = async () => {
         if (!accountId) {
-            showAlert("No active account selected", "error", "alert-circle", 3000)
+            showAlert(t("No active account selected"), "error", "alert-circle", 3000)
             return
         }
 
-        const confirmed = confirm("Delete the synced data for this account from the Vault extension?")
+        const confirmed = confirm(t("Delete the synced data for this account from the Vault extension?"))
         if (!confirmed) return
 
         const deleted = await deleteChromeExtensionAccount({ accountId })
         if (!deleted) {
-            showAlert("Failed to delete the extension data for this account", "error", "x", 3000)
+            showAlert(t("Failed to delete the extension data for this account"), "error", "x", 3000)
             return
         }
 
-        showAlert("Synced account data was removed from the extension", "success", "check", 3000)
+        showAlert(t("Synced account data was removed from the extension"), "success", "check", 3000)
     }
 
     const handleDeleteAllExtensionData = async () => {
-        const confirmed = confirm("Delete all synced data stored by the Vault extension?")
+        const confirmed = confirm(t("Delete all synced data stored by the Vault extension?"))
         if (!confirmed) return
 
         const cleared = await clearChromeExtensionData()
         if (!cleared) {
-            showAlert("Failed to clear all extension data", "error", "x", 3000)
+            showAlert(t("Failed to clear all extension data"), "error", "x", 3000)
             return
         }
 
-        showAlert("All extension data was cleared", "success", "check", 3000)
+        showAlert(t("All extension data was cleared"), "success", "check", 3000)
     }
 
     const handleConnectGoogleDrive = async () => {
@@ -226,7 +229,7 @@ const Settings = (props: SettingsProps) => {
     }
 
     const handleDeleteCurrentGoogleDriveData = async () => {
-        const confirmed = confirm("Delete the current account data from Google Drive? This action cannot be undone.")
+        const confirmed = confirm(t("Delete the current account data from Google Drive? This action cannot be undone."))
         if (!confirmed) return
 
         setDriveActionLoading("delete-current")
@@ -238,7 +241,7 @@ const Settings = (props: SettingsProps) => {
     }
 
     const handleDeleteAllGoogleDriveData = async () => {
-        const confirmed = confirm("Delete all Vault data saved in Google Drive? This action cannot be undone.")
+        const confirmed = confirm(t("Delete all Vault data saved in Google Drive? This action cannot be undone."))
         if (!confirmed) return
 
         setDriveActionLoading("delete-all")
@@ -303,8 +306,7 @@ const Settings = (props: SettingsProps) => {
                 <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-0 md:pb-0">
 
                     <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                        <i className="ti ti-settings mr-2 align-middle inline-block -mt-1.25" /> Settings
-                    </h2>
+                        <i className="ti ti-settings mr-2 align-middle inline-block -mt-1.25" /> {t("Settings")} </h2>
 
                     <div className="flex flex-col w-full form squircle-md">
                         { settings.map((setting) => {
@@ -331,8 +333,7 @@ const Settings = (props: SettingsProps) => {
                 <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-0 md:pb-0">
 
                     <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                        <i className="ti ti-brand-google-drive mr-2 align-middle inline-block -mt-1.25" /> Google Drive Sync
-                    </h2>
+                        <i className="ti ti-brand-google-drive mr-2 align-middle inline-block -mt-1.25" /> {t("Google Drive Sync")} </h2>
 
                     <div className="flex flex-col w-full form squircle-md">
 
@@ -353,21 +354,17 @@ const Settings = (props: SettingsProps) => {
                             <>
                                 <div className="container">
                                     <div>
-                                        <h3>
-                                            Google Drive Connection
-                                        </h3>
+                                        <h3> {t("Google Drive Connection")} </h3>
                                         <div className="description">
                                             { driveState.connected && (
-                                                <>
-                                                    Connected as
-                                                    <b className="ml-1">
+                                                <> {t("Connected as")} <b className="ml-1">
                                                         @{ formatGoogleDriveUserLabel(driveState.email) }
                                                     </b>
                                                 </>
                                             )}
                                             { !driveState.connected && (
                                                 <>
-                                                { isGoogleDriveConfigured() ? "Connect this account to Google Drive appdata." : "Add PUBLIC_GOOGLE_CLIENT_ID in your .env file to enable sync." }
+                                                { isGoogleDriveConfigured() ? t("Connect this account to Google Drive appdata.") : t("Add PUBLIC_GOOGLE_CLIENT_ID in your .env file to enable sync.") }
                                                 </>
                                             )}
                                         </div>
@@ -379,7 +376,7 @@ const Settings = (props: SettingsProps) => {
                                                 disabled={ !isGoogleDriveConfigured() || driveActionLoading === "connect" }
                                                 className="file-input-button disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <i className={ `${driveActionLoading === "connect" ? "ti ti-loader-2 animate-spin" : "ti ti-brand-google-drive"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "connect" ? "Connecting..." : "Connect to Google Drive" }
+                                                <i className={ `${driveActionLoading === "connect" ? "ti ti-loader-2 animate-spin" : "ti ti-brand-google-drive"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "connect" ? t("Connecting...") : t("Connect to Google Drive") }
                                             </button>
                                         ) : (
                                             <button
@@ -387,7 +384,7 @@ const Settings = (props: SettingsProps) => {
                                                 disabled={ driveActionLoading === "disconnect" }
                                                 className="file-input-button bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <i className={ `${driveActionLoading === "disconnect" ? "ti ti-loader-2 animate-spin" : "ti ti-power"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "disconnect" ? "Disconnecting..." : "Disconnect" }
+                                                <i className={ `${driveActionLoading === "disconnect" ? "ti ti-loader-2 animate-spin" : "ti ti-power"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "disconnect" ? t("Disconnecting...") : t("Disconnect") }
                                             </button>
                                         )}
                                     </div>
@@ -411,12 +408,8 @@ const Settings = (props: SettingsProps) => {
 
                                         <div className="container">
                                             <div>
-                                                <h3>
-                                                    Sync from Google Drive
-                                                </h3>
-                                                <div className="description">
-                                                    Download the .vault file from Drive and apply it to this account.
-                                                </div>
+                                                <h3> {t("Sync from Google Drive")} </h3>
+                                                <div className="description"> {t("Download the .vault file from Drive and apply it to this account.")} </div>
                                             </div>
                                             <div className="option">
                                                 <button
@@ -424,19 +417,15 @@ const Settings = (props: SettingsProps) => {
                                                     disabled={ !canUseDriveSyncActions || driveActionLoading === "pull" }
                                                     className="file-input-button disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
-                                                    <i className={ `${driveActionLoading === "pull" ? "ti ti-loader-2 animate-spin" : "ti ti-download"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "pull" ? "Synchronizing..." : "Synchronize from Drive" }
+                                                    <i className={ `${driveActionLoading === "pull" ? "ti ti-loader-2 animate-spin" : "ti ti-download"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "pull" ? t("Synchronizing...") : t("Synchronize from Drive") }
                                                 </button>
                                             </div>
                                         </div>
 
                                         <div className="container">
                                             <div>
-                                                <h3>
-                                                    Upload account data to Drive
-                                                </h3>
-                                                <div className="description">
-                                                    Replace the Google Drive copy with the current local account data.
-                                                </div>
+                                                <h3> {t("Upload account data to Drive")} </h3>
+                                                <div className="description"> {t("Replace the Google Drive copy with the current local account data.")} </div>
                                             </div>
                                             <div className="option md:min-w-60">
                                                 <button
@@ -444,19 +433,15 @@ const Settings = (props: SettingsProps) => {
                                                     disabled={ !canUseDriveSyncActions || driveActionLoading === "push" }
                                                     className="file-input-button disabled:opacity-50 disabled:cursor-not-allowed"
                                                 >
-                                                    <i className={ `${driveActionLoading === "push" ? "ti ti-loader-2 animate-spin" : "ti ti-upload"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "push" ? "Uploading..." : "Replace Account Data" }
+                                                    <i className={ `${driveActionLoading === "push" ? "ti ti-loader-2 animate-spin" : "ti ti-upload"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "push" ? t("Uploading...") : t("Replace Account Data") }
                                                 </button>
                                             </div>
                                         </div>
 
                                         <div className="container">
                                             <div>
-                                                <h3>
-                                                    Delete Account Data from Drive
-                                                </h3>
-                                                <div className="description">
-                                                    Remove the active account's .vault file from Google Drive.
-                                                </div>
+                                                <h3> {t("Delete Account Data from Drive")} </h3>
+                                                <div className="description"> {t("Remove the active account's .vault file from Google Drive.")} </div>
                                             </div>
                                             <div className="option md:min-w-55">
                                                 <button
@@ -464,19 +449,15 @@ const Settings = (props: SettingsProps) => {
                                                     disabled={ !canUseDriveSyncActions || driveActionLoading === "delete-current" }
                                                     className="h-fit w-full px-6 py-3 border duration-300 bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 hover:text-white focus:bg-rose-500/20 focus:border-rose-500 disabled:opacity-50 disabled:cursor-not-allowed squircle-md cursor-pointer"
                                                 >
-                                                    <i className={ `${driveActionLoading === "delete-current" ? "ti ti-loader-2 animate-spin" : "ti ti-trash"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "delete-current" ? "Deleting..." : "Delete Account Data" }
+                                                    <i className={ `${driveActionLoading === "delete-current" ? "ti ti-loader-2 animate-spin" : "ti ti-trash"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "delete-current" ? t("Deleting...") : t("Delete Account Data") }
                                                 </button>
                                             </div>
                                         </div>
 
                                         <div className="container">
                                             <div>
-                                                <h3>
-                                                    Delete All Vault Data from Drive
-                                                </h3>
-                                                <div className="description">
-                                                    Remove every .vault file saved by Vault in Google Drive.
-                                                </div>
+                                                <h3> {t("Delete All Vault Data from Drive")} </h3>
+                                                <div className="description"> {t("Remove every .vault file saved by Vault in Google Drive.")} </div>
                                             </div>
                                             <div className="option md:min-w-60">
                                                 <button
@@ -484,7 +465,7 @@ const Settings = (props: SettingsProps) => {
                                                     disabled={ driveActionLoading === "delete-all" }
                                                     className="h-fit w-full px-6 py-3 border duration-300 bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 hover:text-white focus:bg-rose-500/20 focus:border-rose-500 disabled:opacity-50 disabled:cursor-not-allowed squircle-md cursor-pointer"
                                                 >
-                                                    <i className={ `${driveActionLoading === "delete-all" ? "ti ti-loader-2 animate-spin" : "ti ti-trash"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "delete-all" ? "Deleting..." : "Delete All Vault Data" }
+                                                    <i className={ `${driveActionLoading === "delete-all" ? "ti ti-loader-2 animate-spin" : "ti ti-trash"} text-xl mr-1 align-middle inline-block -mt-1` } /> { driveActionLoading === "delete-all" ? t("Deleting...") : t("Delete All Vault Data") }
                                                 </button>
                                             </div>
                                         </div>
@@ -498,42 +479,30 @@ const Settings = (props: SettingsProps) => {
                 <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-0 md:pb-0">
 
                     <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                        <i className="ti ti-brand-chrome mr-2 align-middle inline-block -mt-1.25" /> Chrome Extension Sync
-                    </h2>
+                        <i className="ti ti-brand-chrome mr-2 align-middle inline-block -mt-1.25" /> {t("Chrome Extension Sync")} </h2>
 
                     <div className="flex md:hidden flex-col w-full form squircle-md">
                         <div className="container gap-1">
                             <div>
-                                <h3>
-                                    Synchronize with Vault extension
-                                </h3>
-                                <div className="description">
-                                    Send the current account data to the Vault extension so it can match passwords on websites.
-                                </div>
+                                <h3> {t("Synchronize with Vault extension")} </h3>
+                                <div className="description"> {t("Send the current account data to the Vault extension so it can match passwords on websites.")} </div>
                             </div>
-                            <div className="text-amber-500 bg-amber-500/5 border border-amber-500/50 p-3 squircle-md">
-                                    This feature is only available on desktop browser.
-                            </div>
+                            <div className="text-amber-500 bg-amber-500/5 border border-amber-500/50 p-3 squircle-md"> {t("This feature is only available on desktop browser.")} </div>
                         </div>
                     </div>
 
                     <div className="hidden md:flex flex-col w-full form squircle-md">
                         <div className="container gap-5">
                             <div>
-                                <h3>
-                                    Synchronize with Vault extension
-                                </h3>
-                                <div className="description">
-                                    Send the current account data to the Vault extension so it can match passwords on websites.
-                                </div>
+                                <h3> {t("Synchronize with Vault extension")} </h3>
+                                <div className="description"> {t("Send the current account data to the Vault extension so it can match passwords on websites.")} </div>
                             </div>
                             <div className="option min-w-65">
                                 <button
                                     onClick={ handleSyncChromeExtension }
                                     className="file-input-button"
                                 >
-                                    <i className="ti ti-brand-chrome text-xl mr-1 align-middle inline-block -mt-1" /> Sync with extension
-                                </button>
+                                    <i className="ti ti-brand-chrome text-xl mr-1 align-middle inline-block -mt-1" /> {t("Sync with extension")} </button>
                             </div>
                         </div>
 
@@ -542,9 +511,7 @@ const Settings = (props: SettingsProps) => {
                                 <i className="ti ti-brand-chrome text-[800px]" />
                             </div>
                             <div className="relative z-10 w-full">
-                                <h2 className="text-xl md:text-2xl font-inter-black mb-4">
-                                    Download VAULT Chrome Extension
-                                </h2>
+                                <h2 className="text-xl md:text-2xl font-inter-black mb-4"> {t("Download VAULT Chrome Extension")} </h2>
                                 <div className="flex flex-row items-center justify-start gap-3 flex-wrap">
                                     <a
                                         href="https://chromewebstore.google.com/detail/vault/dgofgcnbknjnpdfkhlmhkekieapnbhbl"
@@ -552,55 +519,43 @@ const Settings = (props: SettingsProps) => {
                                         rel="noopener noreferrer"
                                         className="block w-fit px-6 py-3 border duration-300 bg-emerald-500/10 border-emerald-500/50 hover:bg-emerald-500/30 hover:border-emerald-500 hover:text-white squircle-md backdrop-blur-3xl font-inter-bold"
                                     >
-                                        <i className="ti ti-download text-xl mr-1 align-middle inline-block -mt-1" /> Download Extension
-                                    </a>
+                                        <i className="ti ti-download text-xl mr-1 align-middle inline-block -mt-1" /> {t("Download Extension")} </a>
                                     <a
                                         href="https://github.com/sizoLabs/vault-chrome-extension"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="block w-fit px-6 py-3 border duration-300 bg-white/2 border-white/10 hover:bg-white/10 hover:border-white hover:text-white text-white/30 squircle-md backdrop-blur-3xl font-inter-bold"
                                     >
-                                        <i className="ti ti-code text-xl mr-1 align-middle inline-block -mt-0.5" /> View source code
-                                    </a>
+                                        <i className="ti ti-code text-xl mr-1 align-middle inline-block -mt-0.5" /> {t("View source code")} </a>
                                 </div>
                             </div>
                         </div>
 
                         <div className="container gap-5">
                             <div>
-                                <h3>
-                                    Delete Account Data from Extension
-                                </h3>
-                                <div className="description">
-                                    Remove the synced data for the active account from the Vault extension.
-                                </div>
+                                <h3> {t("Delete Account Data from Extension")} </h3>
+                                <div className="description"> {t("Remove the synced data for the active account from the Vault extension.")} </div>
                             </div>
                             <div className="option min-w-65">
                                 <button
                                     onClick={ handleDeleteCurrentAccountFromExtension }
                                     className="h-fit w-full px-6 py-3 border duration-300 bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 hover:text-white focus:bg-rose-500/20 focus:border-rose-500 squircle-md cursor-pointer"
                                 >
-                                    <i className="ti ti-trash text-xl mr-1 align-middle inline-block -mt-1" /> Delete Account Data
-                                </button>
+                                    <i className="ti ti-trash text-xl mr-1 align-middle inline-block -mt-1" /> {t("Delete Account Data")} </button>
                             </div>
                         </div>
 
                         <div className="container gap-5">
                             <div>
-                                <h3>
-                                    Delete All Extension Data
-                                </h3>
-                                <div className="description">
-                                    Delete every synced account from the Vault extension.
-                                </div>
+                                <h3> {t("Delete All Extension Data")} </h3>
+                                <div className="description"> {t("Delete every synced account from the Vault extension.")} </div>
                             </div>
                             <div className="option min-w-65">
                                 <button
                                     onClick={ handleDeleteAllExtensionData }
                                     className="h-fit w-full px-6 py-3 border duration-300 bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 hover:text-white focus:bg-rose-500/20 focus:border-rose-500 squircle-md cursor-pointer"
                                 >
-                                    <i className="ti ti-trash text-xl mr-1 align-middle inline-block -mt-1" /> Delete All Accounts Data
-                                </button>
+                                    <i className="ti ti-trash text-xl mr-1 align-middle inline-block -mt-1" /> {t("Delete All Accounts Data")} </button>
                             </div>
                         </div>
                     </div>
@@ -609,38 +564,28 @@ const Settings = (props: SettingsProps) => {
                 <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-0 md:pb-0">
 
                     <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                        <i className="ti ti-database-export mr-2 align-middle inline-block -mt-1.25" /> Export / Import Data
-                    </h2>
+                        <i className="ti ti-database-export mr-2 align-middle inline-block -mt-1.25" /> {t("Export / Import Data")} </h2>
 
                     <div className="flex flex-col w-full form squircle-md">
                         
                         <div className="container">
                             <div>
-                                <h3>
-                                    Export Account Data
-                                </h3>
-                                <div className="description">
-                                    Export the data from this account.
-                                </div>
+                                <h3> {t("Export Account Data")} </h3>
+                                <div className="description"> {t("Export the data from this account.")} </div>
                             </div>
                             <div className="option">
                                 <button
                                     onClick={ handleExportSubmit }
                                     className="file-input-button"
                                 >
-                                    <i className="ti ti-database-export text-xl mr-1 align-middle inline-block -mt-1" /> Export Account Data
-                                </button>
+                                    <i className="ti ti-database-export text-xl mr-1 align-middle inline-block -mt-1" /> {t("Export Account Data")} </button>
                             </div>
                         </div>
 
                         <div className="container">
                             <div>
-                                <h3>
-                                    Import Account Data
-                                </h3>
-                                <div className="description">
-                                    Import data to this account.
-                                </div>
+                                <h3> {t("Import Account Data")} </h3>
+                                <div className="description"> {t("Import data to this account.")} </div>
                             </div>
                             <div className="option">
                                 <FileInput
@@ -657,19 +602,14 @@ const Settings = (props: SettingsProps) => {
                 { isMasterVerifierDisabled ? (
                     <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-0 md:pb-0">
                         <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                            <i className="ti ti-square-f0 mr-2 align-middle inline-block -mt-1.25" /> Master Password Tokens
-                        </h2>
+                            <i className="ti ti-square-f0 mr-2 align-middle inline-block -mt-1.25" /> {t("Master Password Tokens")} </h2>
 
                         <div className="flex flex-col w-full form squircle-md">
                             <div className="container flex-col! gap-5">
 
                                 <div>
-                                    <h3>
-                                        Tokens for Master Password Verification
-                                    </h3>
-                                    <div className="description">
-                                        This allows you to know if the master password is correct. Memorize these tokens, so when you access again you will know if the master password is correct.
-                                    </div>
+                                    <h3> {t("Tokens for Master Password Verification")} </h3>
+                                    <div className="description"> {t("This allows you to know if the master password is correct. Memorize these tokens, so when you access again you will know if the master password is correct.")} </div>
                                 </div>
 
                                 <div className="w-full">
@@ -682,8 +622,7 @@ const Settings = (props: SettingsProps) => {
                                                 className="squircle-md border border-white/10 bg-black/10 p-3"
                                             >
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-lg font-inter-bold text-white">
-                                                        Token { block.id }
+                                                    <span className="text-lg font-inter-bold text-white"> {t("Token")} { block.id }
                                                     </span>
                                                 </div>
                                                 <div className="mt-3 flex flex-row items-center justify-around gap-1">
@@ -695,13 +634,9 @@ const Settings = (props: SettingsProps) => {
                                             </div>
                                             
                                         )) : (
-                                            <div className="md:col-span-4 text-rose-500 bg-rose-500/5 border border-rose-500/50 px-3 py-3 squircle-md">
-                                                Seed preview is unavailable until a master password is available in the current session.
-                                            </div>
+                                            <div className="md:col-span-4 text-rose-500 bg-rose-500/5 border border-rose-500/50 px-3 py-3 squircle-md"> {t("Seed preview is unavailable until a master password is available in the current session.")} </div>
                                         ) }
-                                        <div className="md:col-span-4 text-amber-500 bg-amber-500/5 border border-amber-500/50 p-3 squircle-md mt-3">
-                                                This shows because the "Store Master Password Verification" setting is disabled.
-                                        </div>
+                                        <div className="md:col-span-4 text-amber-500 bg-amber-500/5 border border-amber-500/50 p-3 squircle-md mt-3"> {t("This shows because the \"Store Master Password Verification\" setting is disabled.")} </div>
                                     </div>
                                 </div>
                             </div>
@@ -712,28 +647,21 @@ const Settings = (props: SettingsProps) => {
                 <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-0 md:pb-0">
 
                     <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                        <i className="ti ti-trash mr-2 align-middle inline-block -mt-1.25" /> Reset Account Data
-                    </h2>
+                        <i className="ti ti-trash mr-2 align-middle inline-block -mt-1.25" /> {t("Reset Account Data")} </h2>
 
                     <div className="flex flex-col w-full form squircle-md">
                         
                         <div className="container flex flex-col! gap-5">
                             <div>
-                                <h3>
-                                    Reset Account Data
-                                </h3>
-                                <div className="description">
-                                    This will delete all the data in this account.
-                                    <span className="ml-1 text-rose-500 font-inter-bold">
-                                        Backup your data, this action cannot be undone.
-                                    </span>
+                                <h3> {t("Reset Account Data")} </h3>
+                                <div className="description"> {t("This will delete all the data in this account.")} <span className="ml-1 text-rose-500 font-inter-bold"> {t("Backup your data, this action cannot be undone.")} </span>
                                 </div>
                             </div>
                             <div className="w-full md:max-w-70">
                                 <Input
                                     id="reset-master-password"
                                     type="password"
-                                    placeholder="Master Password"
+                                    placeholder={t("Master Password")}
                                     value={ resetMasterPassword }
                                     onChange={ (event: React.ChangeEvent<HTMLInputElement>) => setResetMasterPassword(event.target.value) }
                                     className="font-inter-medium h-fit w-full px-3 py-2 border duration-300 bg-white/5 border-white/20 focus:bg-white/10 focus:border-white/50 hover:bg-white/10 hover:border-white/50 hover:text-white squircle-md mb-3"
@@ -742,8 +670,7 @@ const Settings = (props: SettingsProps) => {
                                     onClick={ handleResetSubmit }
                                     className="h-fit w-full px-6 py-3 border duration-300 bg-rose-500/10 border-rose-500/50 hover:bg-rose-500/20 hover:border-rose-500 hover:text-white focus:bg-rose-500/20 focus:border-rose-500 squircle-md cursor-pointer"
                                 >
-                                    <i className="ti ti-trash text-xl mr-1 align-middle inline-block -mt-1" /> Reset All Data
-                                </button>
+                                    <i className="ti ti-trash text-xl mr-1 align-middle inline-block -mt-1" /> {t("Reset All Data")} </button>
                             </div>
                         </div>
 
@@ -753,8 +680,7 @@ const Settings = (props: SettingsProps) => {
                 <div className="relative mx-auto flex max-w-200 flex-col px-5 py-5 md:p-10 pb-10">
 
                     <h2 className="text-xl md:text-3xl font-inter-black mb-5">
-                        <i className="ti ti-vault mr-2 align-middle inline-block -mt-1.25" /> Vault Version
-                    </h2>
+                        <i className="ti ti-vault mr-2 align-middle inline-block -mt-1.25" /> {t("Vault Version")} </h2>
 
                     <div className="flex flex-col w-full form squircle-md pt-1 pb-0">
                         <Version detailed accountId={ accountId } />

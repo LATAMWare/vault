@@ -1,0 +1,19 @@
+---
+import Layout from "@layout/home.layout.astro"
+import Login from "@component/sections/login"
+import Background from "@component/global/background"
+import { readAuthSettings } from "../server/auth"
+import { readCompanySession } from "../server/company-session"
+
+const settings = readAuthSettings()
+if (settings.mode === "local") return Astro.redirect("/")
+const { user, cookies, denied } = await readCompanySession(Astro.request, settings)
+for (const cookie of cookies) Astro.response.headers.append("Set-Cookie", cookie)
+Astro.response.headers.set("Cache-Control", "no-store")
+if (user) return Astro.redirect("/")
+const errorCode = denied ? "AccessDenied" : Astro.url.searchParams.get("error")
+---
+<Layout>
+    <Background client:load />
+    <Login errorCode={errorCode} client:load />
+</Layout>

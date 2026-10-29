@@ -19,7 +19,12 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/check.yml
   publish:
+    needs: verify
+    if: always() && (needs.verify.result == 'success' || needs.verify.result == 'skipped')
     runs-on: ubuntu-latest
 
     permissions:

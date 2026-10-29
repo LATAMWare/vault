@@ -1,4 +1,4 @@
-import { type ReactNode } from "react"
+
 
 type ButtonVariant = "delete" | "cancel" | "success"
 type ButtonPosition = "start" | "end"
@@ -8,6 +8,7 @@ interface DialogButton {
     variant: ButtonVariant
     onClick: () => void | Promise<void>
     position?: ButtonPosition
+    disabled?: boolean
 }
 
 interface DialogFooterProps {
@@ -39,6 +40,8 @@ const DialogFooter = (props: DialogFooterProps) => {
             <div className="flex gap-2 md:gap-5 flex-col md:flex-row w-full md:w-auto">
                 {startButtons.map((button, index) => (
                     <button
+                        type="button"
+                        disabled={button.disabled}
                         key={index}
                         onClick={button.onClick}
                         className={getButtonClasses(button.variant)}
@@ -50,6 +53,8 @@ const DialogFooter = (props: DialogFooterProps) => {
             <div className="flex gap-2 md:gap-5 flex-col md:flex-row w-full md:w-auto">
                 {endButtons.map((button, index) => (
                     <button
+                        type="button"
+                        disabled={button.disabled}
                         key={index}
                         onClick={button.onClick}
                         className={getButtonClasses(button.variant)}

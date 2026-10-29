@@ -1,4 +1,4 @@
-import * as randomseed from "random-seed"
+import randomseed from "random-seed"
 
 export interface BackgroundSVGData {
     pathData: string

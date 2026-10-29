@@ -28,11 +28,20 @@ export const showAlert = (message: string, type: string, icon: string, time: num
 
     alert.setAttribute("id", id)
 
-    alert.innerHTML = `<span><i class="icon ti ti-${ icon }"></i></span> ${ message }<button class="alert-close" aria-label="Cerrar alerta"><i class="ti ti-x"></i></button>`
+    const iconContainer = document.createElement('span')
+    const iconElement = document.createElement('i')
+    iconElement.className = `icon ti ti-${/^[a-z0-9-]+$/i.test(icon) ? icon : "info-circle"}`
+    iconContainer.append(iconElement)
+    const text = document.createElement('span')
+    text.textContent = message.replace(/<\/?b>/g, "")
+    const closeButton = document.createElement('button')
+    closeButton.className = 'alert-close'
+    closeButton.setAttribute('aria-label', 'Cerrar alerta')
+    closeButton.textContent = '×'
+    alert.append(iconContainer, text, closeButton)
 
     container.append(alert)
     
-    const closeButton = alert.querySelector('.alert-close')
     if (closeButton) {
         closeButton.addEventListener('click', () => closeAlert(alert))
     }

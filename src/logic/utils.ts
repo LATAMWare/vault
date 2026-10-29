@@ -1,6 +1,16 @@
-import * as randomseed from "random-seed"
+import { t } from "@logic/i18n"
+import randomseed from "random-seed"
 
-export const generateId = () => Math.random().toString(36).substring(2, 8) + Math.random().toString(36).substring(2, 8)
+export type PasswordAlgorithm = "legacy" | "pbkdf2-v2"
+export const CURRENT_PASSWORD_ALGORITHM: PasswordAlgorithm = "pbkdf2-v2"
+const ENCRYPTION_PREFIX = "vault:v2:"
+export const KDF_ITERATIONS = 600000
+
+export const generateId = () => {
+    const cryptoApi = globalThis.crypto ?? (typeof window !== "undefined" ? window.crypto : undefined)
+    if (!cryptoApi?.getRandomValues) throw new Error(t("Secure random generation is unavailable"))
+    return Array.from(cryptoApi.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("")
+}
 
 export const generateAccountId = (): string => {
 
@@ -10,11 +20,8 @@ export const generateAccountId = (): string => {
         return cryptoApi.randomUUID()
     }
 
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-        const random = Math.random() * 16 | 0
-        const value = char === 'x' ? random : (random & 0x3) | 0x8
-        return value.toString(16)
-    })
+    const hex = generateId()
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${((parseInt(hex[16], 16) & 3) | 8).toString(16)}${hex.slice(17, 20)}-${hex.slice(20)}`
 	
 }
 
@@ -26,10 +33,16 @@ export const genServicePassword = async (
 		identifier: string,
 		characters: string
 	},
-	version?: number
+	version = 1,
+    algorithm: PasswordAlgorithm = "legacy"
 ): Promise<string> => {
 
     if(master == '' || identifier == '') return ''
+    if (!Number.isInteger(length) || length < 1 || length > 1024) throw new Error(t("Password length must be between 1 and 1024"))
+    if (!Number.isInteger(version) || version < 1 || version > 999) throw new Error(t("Invalid password version"))
+    if (!alphabet?.identifier || !alphabet.characters) throw new Error(t("Select a valid alphabet"))
+    if (algorithm === "pbkdf2-v2") return createSecurePassword(master, identifier, length, alphabet, version)
+    if (algorithm !== "legacy") throw new Error(t("Unsupported password algorithm"))
 
 	let versionHash = ''
 
@@ -50,6 +63,28 @@ export const genServicePassword = async (
 
 }
 
+// Versioned separately from password rotation, so existing passwords never change on upgrade.
+const createSecurePassword = async (master: string, identifier: string, length: number, alphabet: { identifier: string, characters: string }, version: number) => {
+    const cryptoApi = ensureCryptoAvailability()
+    const encoder = new TextEncoder()
+    const material = await cryptoApi.subtle.importKey("raw", encoder.encode(master), "PBKDF2", false, ["deriveKey"])
+    const salt = encoder.encode(JSON.stringify(["latamware-vault-password-v2", identifier, alphabet.identifier, alphabet.characters, version]))
+    const key = await cryptoApi.subtle.deriveKey({ name: "PBKDF2", salt, iterations: KDF_ITERATIONS, hash: "SHA-256" }, material, { name: "HMAC", hash: "SHA-256", length: 256 }, false, ["sign"])
+    const characters = Array.from(alphabet.characters)
+    if (characters.length > 65536) throw new Error(t("Alphabet is too large"))
+    // Rejection sampling avoids modulo bias; HMAC expands the derived key deterministically.
+    const limit = Math.floor(65536 / characters.length) * characters.length
+    let result = "", count = 0, block = 0
+    while (count < length) {
+        const bytes = new DataView(await cryptoApi.subtle.sign("HMAC", key, encoder.encode(`password-block:${block++}`)))
+        for (let offset = 0; offset < bytes.byteLength && count < length; offset += 2) {
+            const value = bytes.getUint16(offset)
+            if (value < limit) { result += characters[value % characters.length]; count++ }
+        }
+    }
+    return result
+}
+
 const createPassword = async (hash: string, length: number, alphabet: string): Promise<string> => {
 
     const seed = randomseed.create(hash)
@@ -67,10 +102,10 @@ export const ensureCryptoAvailability = () => {
     if (!cryptoApi || !cryptoApi.subtle) {
         const isSecureContext = typeof window !== "undefined" ? window.isSecureContext : globalThis.isSecureContext === true
         const reason = isSecureContext
-            ? "Web Crypto was not initialized correctly"
-            : "This page is not running in a secure context. Use HTTPS or localhost."
+            ? t("Web Crypto was not initialized correctly")
+            : t("This page is not running in a secure context. Use HTTPS or localhost.")
 
-        throw new Error(`Web Crypto is unavailable: ${reason}`)
+        throw new Error(t("Web Crypto is unavailable: {{value0}}", { value0: reason }))
     }
     return cryptoApi
 }
@@ -82,7 +117,7 @@ const createHash = async (str: string): Promise<string> => {
 }
 
 export const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+    return navigator.clipboard.writeText(text)
 }
 
 export const downloadFile = (data: string, filename: string, type: string) => {
@@ -125,19 +160,21 @@ const generateKey = async (masterKey: string, salt: BufferSource, iterations: nu
 
 }
 
-export const encodeData = async (masterKey: string, data: any) => {
+export const encodeData = async (masterKey: string, data: string) => {
 
 	const cryptoApi = ensureCryptoAvailability()
 	const encoder = new TextEncoder()
 
 	const salt = cryptoApi.getRandomValues(new Uint8Array(16))
-	const iv = cryptoApi.getRandomValues(new Uint8Array(16))
+	const iv = cryptoApi.getRandomValues(new Uint8Array(12))
 	const bufferData = encoder.encode(data)
-	const key = await generateKey(masterKey, salt, 100000, 256, 'SHA-256')
+	const key = await generateKey(masterKey, salt, KDF_ITERATIONS, 256, 'SHA-256', 'AES-GCM')
 
-	const encodedData = await cryptoApi.subtle.encrypt({ name: "AES-CBC", iv: iv }, key, bufferData)
+	const encodedData = await cryptoApi.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(ENCRYPTION_PREFIX) }, key, bufferData)
 
-	return bufToBase64(new Uint8Array([...salt, ...iv, ...new Uint8Array(encodedData)]).buffer)
+    const payload = new Uint8Array(salt.length + iv.length + encodedData.byteLength)
+    payload.set(salt); payload.set(iv, salt.length); payload.set(new Uint8Array(encodedData), salt.length + iv.length)
+	return ENCRYPTION_PREFIX + bufToBase64(payload.buffer)
 
 }
 
@@ -146,18 +183,30 @@ export const decodeData = async (masterKey: string, data: string) => {
 	const cryptoApi = ensureCryptoAvailability()
 	const decoder = new TextDecoder()
 
-	const bufferData = base64ToBuf(data)
+    if (typeof data !== "string") throw new Error(t("Invalid encrypted data"))
+    if (data.startsWith("vault:") && !data.startsWith(ENCRYPTION_PREFIX)) throw new Error(t("Unsupported encryption version"))
+    const authenticated = data.startsWith(ENCRYPTION_PREFIX)
+	const bufferData = base64ToBuf(authenticated ? data.slice(ENCRYPTION_PREFIX.length) : data)
+    if (bufferData.byteLength < (authenticated ? 44 : 48)) throw new Error(t("Invalid encrypted data"))
 	const salt = bufferData.slice(0, 16)
-	const iv = bufferData.slice(16, 32)
-	const key = await generateKey(masterKey, salt, 100000, 256, 'SHA-256')
+    const offset = authenticated ? 28 : 32
+	const iv = bufferData.slice(16, offset)
+	const key = await generateKey(masterKey, salt, authenticated ? KDF_ITERATIONS : 100000, 256, 'SHA-256', authenticated ? 'AES-GCM' : 'AES-CBC')
 
-	const decodeDataBuffer = await cryptoApi.subtle.decrypt({ name: "AES-CBC", iv: iv }, key, bufferData.slice(32))
+	const decodeDataBuffer = await cryptoApi.subtle.decrypt(authenticated
+        ? { name: "AES-GCM", iv, additionalData: new TextEncoder().encode(ENCRYPTION_PREFIX) }
+        : { name: "AES-CBC", iv }, key, bufferData.slice(offset))
 
 	return decoder.decode(decodeDataBuffer)
 
 }
 
-export const bufToBase64 = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b)))
+export const bufToBase64 = (b: ArrayBuffer) => {
+    const bytes = new Uint8Array(b)
+    const chunks: string[] = []
+    for (let offset = 0; offset < bytes.length; offset += 32768) chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 32768)))
+    return btoa(chunks.join(""))
+}
 export const base64ToBuf = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer
 
 export const randomBytes = (len = 16) => {
@@ -167,7 +216,7 @@ export const randomBytes = (len = 16) => {
 	return b.buffer
 }
 
-export const deriveHmacKey = async (password: string, salt: ArrayBuffer, iterations = 200000) => {
+export const deriveHmacKey = async (password: string, salt: ArrayBuffer, iterations = KDF_ITERATIONS) => {
 	const cryptoApi = ensureCryptoAvailability()
 	const enc = new TextEncoder()
 	const baseKey = await cryptoApi.subtle.importKey('raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey'])
@@ -175,7 +224,7 @@ export const deriveHmacKey = async (password: string, salt: ArrayBuffer, iterati
 		{ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
 		baseKey,
 		{ name: 'HMAC', hash: 'SHA-256' },
-		true,
+		false,
 		['sign', 'verify']
 	)
 	return key
