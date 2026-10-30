@@ -1,24 +1,26 @@
 import { useEffect, useState } from "react"
 import { useI18n } from "@logic/i18n"
-import { setupPwa, getInstallPrompt, clearInstallPrompt } from "@logic/pwa"
+import { setupPwa, getInstallPrompt, clearInstallPrompt, isPwaInstalled, markPwaInstalled } from "@logic/pwa"
 import CompanyDialog from "../company/dialog"
 
 export default function InstallApp() {
     const { t } = useI18n()
-    const [installed, setInstalled] = useState(false),
+    const [installed, setInstalled] = useState<boolean | null>(null),
         [help, setHelp] = useState(false)
     useEffect(() => {
         setupPwa()
-        const update = () =>
-            setInstalled(
-                Boolean(
-                    window.matchMedia?.("(display-mode: standalone)").matches ||
-                    (navigator as Navigator & { standalone?: boolean }).standalone
-                )
-            )
+        const update = () => {
+            const value = isPwaInstalled()
+            setInstalled(value)
+            if (value) setHelp(false)
+        }
         update()
         window.addEventListener("vault:installed", update)
-        return () => window.removeEventListener("vault:installed", update)
+        window.addEventListener("vault:installable", update)
+        return () => {
+            window.removeEventListener("vault:installed", update)
+            window.removeEventListener("vault:installable", update)
+        }
     }, [])
     const install = async () => {
         const event = getInstallPrompt()
@@ -28,12 +30,12 @@ export default function InstallApp() {
         }
         clearInstallPrompt()
         try {
-            if ((await event.prompt()).outcome === "accepted") setInstalled(true)
+            if ((await event.prompt()).outcome === "accepted") markPwaInstalled()
         } catch {
             setHelp(true)
         }
     }
-    if (installed) return null
+    if (installed !== false) return null
     return (
         <>
             <button className="cw-nav-button" onClick={() => void install()}>

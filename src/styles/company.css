@@ -784,6 +784,23 @@
     font-size: 12px;
     white-space: nowrap;
 }
+[data-floating-dropdown] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 11px;
+    background: transparent;
+    color: inherit;
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    overflow: auto;
+}
+[data-floating-dropdown] > .cw-menu-popover {
+    position: static;
+    min-width: min(190px, calc(100vw - 16px));
+}
 .cw-menu-popover button:hover {
     background: #ffffff08;
 }

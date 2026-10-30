@@ -6,6 +6,8 @@
   "lang": "es",
   "start_url": "/",
   "scope": "/",
+  "related_applications": [{ "platform": "webapp", "id": "/", "url": "/manifest.webmanifest" }],
+  "prefer_related_applications": false,
   "display": "standalone",
   "background_color": "#1e1927",
   "theme_color": "#1e1927",

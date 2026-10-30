@@ -132,6 +132,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                         </small>
                     </div>
                     <Dropdown
+                        floating
                         className="cw-menu"
                         triggerClassName="cw-icon-button"
                         label={t("Account options")}
@@ -515,6 +516,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                     )}
                                     {c.canManage && (
                                         <Dropdown
+                                            floating
                                             className="cw-menu"
                                             triggerClassName="cw-icon-button"
                                             label={t("Vault options")}
@@ -705,6 +707,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                             )}
                                                             {c.canEdit && (
                                                                 <Dropdown
+                                                                    floating
                                                                     className="cw-menu"
                                                                     triggerClassName="cw-icon-button"
                                                                     label={t("Options for {{name}}", {

@@ -88,7 +88,7 @@ The unmodified server dependency `@vitrified/typescript-opentimestamps@0.2.2` is
 
 ## Installable web app and search exclusion
 
-The app includes a standalone web manifest, padded 192/512 PNG icons, Apple home-screen metadata and an Install app action in the company menu. Supported browsers show their native installation prompt; Safari/other browsers receive short platform instructions. HTTPS or localhost is required. Google login and the same server permissions continue to apply in the installed app.
+The app includes a standalone web manifest, padded 192/512 PNG icons, Apple home-screen metadata and an Install app action in the company menu. Supported browsers show their native installation prompt; Safari/other browsers receive short platform instructions. The action hides in installed mode, after an installation event, or when the browser reports this related web app as installed. A local, non-sensitive installation marker retains that state across reloads; a fresh browser install offer clears stale markers after uninstallation. Browsers without installation detection may require opening the installed app once to remember it. HTTPS or localhost is required. Google login and the same server permissions continue to apply in the installed app.
 
 The service worker is network-only. It never stores authenticated HTML, API responses or credentials in Cache Storage; offline navigation shows a generic connection message without any vault data. APIs, OAuth routes, other origins, POSTs and subresource requests are not intercepted. Ordinary static browser asset caching remains separate from vault data.
 
