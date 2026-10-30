@@ -1,0 +1,81 @@
+:root {
+    --vault-scroll-thumb: #77658c;
+    --vault-scroll-hover: #b69bdb;
+    --vault-scroll-track: #18141f;
+}
+* {
+    scrollbar-color: var(--vault-scroll-thumb) var(--vault-scroll-track);
+    scrollbar-width: thin;
+}
+@supports selector(::-webkit-scrollbar) {
+    * {
+        scrollbar-color: auto;
+        scrollbar-width: auto;
+    }
+    *::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    *::-webkit-scrollbar-track {
+        background: var(--vault-scroll-track);
+        border-radius: 999px;
+    }
+    *::-webkit-scrollbar-thumb {
+        background: var(--vault-scroll-thumb);
+        border: 2px solid var(--vault-scroll-track);
+        border-radius: 999px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+        background: var(--vault-scroll-hover);
+    }
+    *::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+}
+.vault-tooltip {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    width: max-content;
+    max-width: min(280px, calc(100vw - 24px));
+    padding: 8px 11px;
+    border: 1px solid #bda3de40;
+    border-radius: 8px;
+    background: #302637;
+    box-shadow: 0 5px 18px #0005;
+    color: #f2eafa;
+    font:
+        12px/1.5 "Inter Regular",
+        sans-serif;
+    overflow-wrap: anywhere;
+    z-index: 10000;
+    animation: vault-tooltip-in 120ms ease-out;
+}
+.vault-tooltip[hidden] {
+    display: none;
+}
+@keyframes vault-tooltip-in {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .vault-tooltip {
+        animation: none;
+    }
+}
+@media (forced-colors: active) {
+    * {
+        scrollbar-color: auto;
+    }
+    .vault-tooltip {
+        border-color: CanvasText;
+        background: Canvas;
+        color: CanvasText;
+    }
+}

@@ -24,6 +24,7 @@ export interface CompanyItem extends ItemContent {
     id: string
     version: number
     updatedAt: number
+    pinned: boolean
 }
 export interface VaultDetail extends CompanyVault {
     items: CompanyItem[]

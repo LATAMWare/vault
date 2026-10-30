@@ -28,6 +28,118 @@ function fixture(t) {
     return { root, settings, admin, alice, bob, get store() { return store }, reopen(next = settings) { store.close(); store = new CompanyStore(next); return store } }
 }
 
+test('pins are personal, persistent and available to readers without changing shared item versions', t => {
+    const f = fixture(t), { store, admin, alice, bob } = f
+    const vault = store.createVault(admin, 'Personal pins')
+    const first = store.saveItem(admin, vault.id, content())
+    const second = store.saveItem(admin, vault.id, { ...content(), title: 'Another item' })
+    store.share(admin, vault.id, alice.email, 'reader', policy)
+    store.setPinned(alice, vault.id, first.id, true)
+    const pinned = store.getVault(alice, vault.id).items
+    assert.equal(pinned[0].id, first.id)
+    assert.equal(pinned[0].pinned, true)
+    assert.equal(pinned[0].version, 1)
+    assert.equal(store.getVault(admin, vault.id).items.every(item => !item.pinned), true)
+    denied(() => store.setPinned(bob, vault.id, first.id, true), 404)
+    denied(() => store.setPinned(alice, vault.id, second.id, 'yes'), 400)
+    const other = store.createVault(admin, 'Other')
+    denied(() => store.setPinned(admin, other.id, first.id, true), 404)
+    assert.equal(f.reopen().getVault(alice, vault.id).items.find(item => item.id === first.id).pinned, true)
+    f.store.setPinned(alice, vault.id, first.id, false)
+    assert.equal(f.store.getVault(alice, vault.id).items.every(item => !item.pinned), true)
+    f.store.setPinned(alice, vault.id, first.id, true)
+    f.store.deleteItem(admin, vault.id, first.id, 1)
+    assert.equal(f.store.db.prepare('SELECT count(*) n FROM company_pins').get().n, 0)
+})
+
+test('copy requests and edits identify the actor and item without storing credential values in activity', t => {
+    const { store, admin, alice, bob } = fixture(t)
+    const vault = store.createVault(admin, 'Audit copies')
+    const item = store.saveItem(admin, vault.id, content())
+    store.share(admin, vault.id, alice.email, 'reader', policy)
+    assert.equal(store.copyItem(alice, vault.id, item.id, 'username').value, content().username)
+    assert.equal(store.copyItem(alice, vault.id, item.id, 'password').value, content().password)
+    denied(() => store.copyItem(bob, vault.id, item.id, 'password'), 404)
+    denied(() => store.copyItem(alice, vault.id, item.id, 'title'), 400)
+    denied(() => store.copyItem(alice, vault.id, item.id, ['password']), 400)
+    const events = store.getAudit(admin, vault.id)
+    const copies = events.filter(entry => entry.action.endsWith('_copy_requested'))
+    assert.equal(copies.length, 2)
+    assert.ok(copies.every(entry => entry.actor === alice.email && entry.target === content().title && entry.createdAt > 0))
+    for (const value of [content().password, content().username, content().notes]) assert.equal(JSON.stringify(events).includes(value), false)
+    store.saveItem(admin, vault.id, { ...content(), title: 'Renamed hosting' }, item.id, 1)
+    assert.equal(store.getAudit(admin, vault.id).find(entry => entry.action === 'item.updated').target, 'Renamed hosting')
+    const member = store.listMembers(admin, vault.id).find(member => member.email === alice.email)
+    store.removeMember(admin, vault.id, member.id)
+    denied(() => store.copyItem(alice, vault.id, item.id, 'password'), 404)
+    denied(() => store.setPinned(alice, vault.id, item.id, true), 404)
+})
+
+test('exports only include explicitly selected accessible vaults and audit exports without restoring sharing', t => {
+    const { store, admin, alice, bob } = fixture(t)
+    const vault = store.createVault(admin, 'Exportable')
+    store.saveItem(admin, vault.id, content())
+    store.share(admin, vault.id, alice.email, 'reader', policy)
+    const backup = store.exportData(alice, [vault.id])
+    assert.equal(backup.format, 'latamware-company-backup')
+    assert.deepEqual(backup.vaults, [{ name: 'Exportable', items: [content()] }])
+    assert.equal(JSON.stringify(backup).includes('wrapped_key'), false)
+    denied(() => store.exportData(bob, [vault.id]), 404)
+    denied(() => store.exportData(alice, [vault.id, store.listVaults(admin).find(value => value.id !== vault.id).id]), 404)
+    denied(() => store.exportData(alice, []), 400)
+    const imported = store.importLocal(alice, backup)
+    assert.equal(store.getVault(alice, imported.vaultIds[0]).role, 'owner')
+    denied(() => store.getVault(admin, imported.vaultIds[0]), 404)
+    assert.equal(store.importLocal(alice, backup).alreadyImported, true)
+    assert.equal(store.getAudit(admin, vault.id).filter(entry => entry.action === 'vault.exported').length, 1)
+})
+
+test('routine authentication reads do not write but still check revocation and claim new invitations immediately', t => {
+    const { store, admin, alice } = fixture(t)
+    const before = store.db.prepare('SELECT total_changes() n').get().n
+    store.authenticate({ id: alice.id, email: alice.email }, Date.now())
+    assert.equal(store.db.prepare('SELECT total_changes() n').get().n, before)
+    const vault = store.createVault(admin, 'Pending invitation')
+    store.share(admin, vault.id, 'future@latamware.test', 'reader', policy)
+    const future = store.authenticate({ id: 'new-future-sub', email: 'future@latamware.test' }, Date.now())
+    assert.equal(store.listVaults(future)[0].id, vault.id)
+    const oldLogin = Date.now() - 1000
+    store.revokeSessions(admin, alice.id)
+    denied(() => store.authenticate({ id: alice.id, email: alice.email }, oldLogin), 401)
+})
+
+test('existing schema v1 databases upgrade in place without changing encrypted items or memberships', t => {
+    const f = fixture(t), { store, admin, alice } = f
+    const vault = store.createVault(admin, 'Before upgrade')
+    const saved = store.saveItem(admin, vault.id, content())
+    store.share(admin, vault.id, alice.email, 'reader', policy)
+    const payload = store.db.prepare('SELECT payload FROM company_items WHERE id=?').get(saved.id).payload
+    store.db.exec('DROP TABLE company_pins; PRAGMA user_version=1;')
+    const upgraded = f.reopen()
+    assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version, 2)
+    assert.equal(upgraded.db.prepare('SELECT payload FROM company_items WHERE id=?').get(saved.id).payload, payload)
+    assert.equal(upgraded.getVault(alice, vault.id).items[0].password, content().password)
+    assert.equal(upgraded.getVault(alice, vault.id).items[0].pinned, false)
+    upgraded.setPinned(alice, vault.id, saved.id, true)
+    assert.equal(upgraded.getVault(alice, vault.id).items[0].pinned, true)
+})
+
+test('vault activity preserves names and resolves historical UUID targets for both vault and global activity', t => {
+    const { store, admin } = fixture(t)
+    const vault = store.createVault(admin, 'Named vault')
+    const created = store.getAudit(admin, vault.id).find(entry => entry.action === 'vault.created')
+    assert.equal(created.target, 'Named vault')
+    store.renameVault(admin, vault.id, 'Renamed vault', vault.version)
+    assert.equal(store.getAudit(admin, vault.id).find(entry => entry.action === 'vault.created').target, 'Named vault')
+    // Simulate a pre-upgrade audit row without rewriting the historical database record.
+    store.db.prepare('UPDATE company_audit SET target=? WHERE id=?').run(vault.id, created.id)
+    assert.equal(store.getAudit(admin, vault.id).find(entry => entry.id === created.id).target, 'Renamed vault')
+    assert.equal(store.adminData(admin).audit.find(entry => entry.id === created.id).target, 'Renamed vault')
+    const current = store.getVault(admin, vault.id)
+    store.deleteVault(admin, vault.id, current.version)
+    assert.equal(store.adminData(admin).audit.find(entry => entry.action === 'vault.deleted' && entry.target === 'Renamed vault').target, 'Renamed vault')
+})
+
 test('Google users get central encrypted vaults, pending invitations and server-enforced roles', t => {
     const f = fixture(t), { store, admin, alice, bob } = f
     assert.equal(store.listVaults(admin).length, 1)

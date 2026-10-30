@@ -80,7 +80,7 @@ export class CompanyStore {
         this.db = new DatabaseSync(settings.path)
         try {
             const schemaVersion = (this.db.prepare("PRAGMA user_version").get() as Row).user_version
-            if (schemaVersion > 1) throw new Error("Unsupported company database version")
+            if (schemaVersion > 2) throw new Error("Unsupported company database version")
             if (process.platform !== "win32") chmodSync(settings.path, 0o600)
             this.db.exec(`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
                 CREATE TABLE IF NOT EXISTS company_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -98,6 +98,10 @@ export class CompanyStore {
                 CREATE TABLE IF NOT EXISTS company_items (
                     id TEXT PRIMARY KEY, vault_id TEXT NOT NULL REFERENCES company_vaults(id) ON DELETE CASCADE,
                     payload TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS company_pins (
+                    user_id TEXT NOT NULL REFERENCES company_users(id) ON DELETE CASCADE,
+                    item_id TEXT NOT NULL REFERENCES company_items(id) ON DELETE CASCADE,
+                    PRIMARY KEY(user_id,item_id));
                 CREATE TABLE IF NOT EXISTS company_audit (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, vault_id TEXT, actor_id TEXT NOT NULL,
                     actor_email TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL, created_at INTEGER NOT NULL);
@@ -105,9 +109,10 @@ export class CompanyStore {
                     user_id TEXT NOT NULL REFERENCES company_users(id), source_id TEXT NOT NULL,
                     result TEXT NOT NULL, PRIMARY KEY(user_id, source_id));
                 CREATE INDEX IF NOT EXISTS company_member_users ON company_members(user_id);
+                CREATE INDEX IF NOT EXISTS company_pending_emails ON company_members(invited_email) WHERE user_id IS NULL;
                 CREATE INDEX IF NOT EXISTS company_item_vaults ON company_items(vault_id);
                 CREATE INDEX IF NOT EXISTS company_audit_vaults ON company_audit(vault_id, id);`)
-            this.db.exec("PRAGMA user_version=1")
+            this.db.exec("PRAGMA user_version=2")
             for (const row of this.all("SELECT id,wrapped_key FROM company_vaults"))
                 unwrapKey(row.wrapped_key, row.id, settings.keys)
         } catch (error) {
@@ -151,6 +156,19 @@ export class CompanyStore {
     }
     authenticate(identity: { id: string; email: string }, authenticatedAt: number): CompanyUser {
         if (!Number.isFinite(authenticatedAt)) throw new CompanyError(401, "Please sign in again.")
+        // Check revocation on every request, but avoid a disk write/lock on every read.
+        const known = this.one("SELECT * FROM company_users WHERE id=?", identity.id)
+        if (known?.disabled) throw new CompanyError(403, "Your account is disabled. Contact the administrator.")
+        if (known && authenticatedAt <= known.revoked_at) throw new CompanyError(401, "Please sign in again.")
+        const normalized = normalizeEmail(identity.email)
+        const isAdmin = this.settings.admins.includes(normalized)
+        if (
+            known?.email === normalized &&
+            Date.now() - known.last_seen < 60000 &&
+            !this.one("SELECT id FROM company_members WHERE user_id IS NULL AND invited_email=? LIMIT 1", normalized) &&
+            (!isAdmin || this.one("SELECT value FROM company_meta WHERE key='initial-vault'"))
+        )
+            return { ...identity, email: normalized, isAdmin }
         return this.transaction(() => {
             const current = this.one("SELECT * FROM company_users WHERE id=?", identity.id)
             if (current?.disabled) throw new CompanyError(403, "Your account is disabled. Contact the administrator.")
@@ -166,7 +184,11 @@ export class CompanyStore {
                 Date.now(),
                 Date.now()
             )
-            const actor = { ...identity, email, isAdmin: this.settings.admins.includes(email) }
+            const actor = {
+                ...identity,
+                email,
+                isAdmin: this.settings.admins.includes(email)
+            }
             if (!current) this.audit(actor, "user.joined", identity.id)
             // Invitations bind once to Google's immutable subject, never to a mutable email thereafter.
             this.run(
@@ -205,12 +227,16 @@ export class CompanyStore {
             role: row.role,
             version: row.version,
             updatedAt: row.updated_at,
-            itemCount: this.one("SELECT count(*) AS total FROM company_items WHERE vault_id=?", row.id)!.total
+            itemCount:
+                row.item_count ??
+                this.one("SELECT count(*) AS total FROM company_items WHERE vault_id=?", row.id)!.total
         }
     }
     listVaults(actor: CompanyUser): CompanyVault[] {
         return this.all(
-            `SELECT v.*,m.role FROM company_vaults v JOIN company_members m ON m.vault_id=v.id
+            `SELECT v.id,v.name,v.version,v.updated_at,m.role,
+            (SELECT count(*) FROM company_items i WHERE i.vault_id=v.id) AS item_count
+            FROM company_vaults v JOIN company_members m ON m.vault_id=v.id
             WHERE m.user_id=? ORDER BY v.name COLLATE NOCASE,v.id`,
             actor.id
         ).map((row) => this.summary(row))
@@ -219,7 +245,10 @@ export class CompanyStore {
         const row = this.member(actor, vaultId),
             key = this.key(row)
         const items: CompanyItem[] = this.all(
-            "SELECT * FROM company_items WHERE vault_id=? ORDER BY updated_at DESC,id",
+            `SELECT i.*,p.item_id IS NOT NULL AS pinned FROM company_items i
+            LEFT JOIN company_pins p ON p.item_id=i.id AND p.user_id=?
+            WHERE i.vault_id=? ORDER BY pinned DESC,i.updated_at DESC,i.id`,
+            actor.id,
             vaultId
         ).map((item) => ({
             ...itemContent(
@@ -227,9 +256,67 @@ export class CompanyStore {
             ),
             id: item.id,
             version: item.version,
-            updatedAt: item.updated_at
+            updatedAt: item.updated_at,
+            pinned: Boolean(item.pinned)
         }))
         return { ...this.summary(row), items }
+    }
+    setPinned(actor: CompanyUser, vaultId: string, itemId: string, pinned: unknown) {
+        return this.transaction(() => {
+            this.member(actor, vaultId)
+            if (typeof pinned !== "boolean") throw new CompanyError(400, "Invalid request.")
+            if (!this.one("SELECT id FROM company_items WHERE id=? AND vault_id=?", itemId, vaultId))
+                throw new CompanyError(404, "Not found.")
+            if (pinned) this.run("INSERT OR IGNORE INTO company_pins(user_id,item_id) VALUES(?,?)", actor.id, itemId)
+            else this.run("DELETE FROM company_pins WHERE user_id=? AND item_id=?", actor.id, itemId)
+            return { pinned }
+        })
+    }
+    copyItem(actor: CompanyUser, vaultId: string, itemId: string, field: unknown) {
+        return this.transaction(() => {
+            const row = this.member(actor, vaultId)
+            if (typeof field !== "string" || !["password", "username", "notes"].includes(field))
+                throw new CompanyError(400, "Invalid request.")
+            const item = this.one("SELECT * FROM company_items WHERE id=? AND vault_id=?", itemId, vaultId)
+            if (!item) throw new CompanyError(404, "Not found.")
+            const content = itemContent(
+                JSON.parse(
+                    decrypt(this.key(row), JSON.parse(item.payload), `vault-item:${vaultId}:${item.id}:${item.version}`)
+                )
+            )
+            if ((field === "password" || field === "username") && content.kind !== "password")
+                throw new CompanyError(400, "Invalid request.")
+            this.audit(actor, `item.${field}_copy_requested`, content.title, vaultId)
+            return { value: content[field as "password" | "username" | "notes"] }
+        })
+    }
+    exportData(actor: CompanyUser, vaultIds: unknown) {
+        if (
+            !Array.isArray(vaultIds) ||
+            !vaultIds.length ||
+            vaultIds.length > 200 ||
+            vaultIds.some((id) => typeof id !== "string") ||
+            new Set(vaultIds).size !== vaultIds.length
+        )
+            throw new CompanyError(400, "Select at least one vault.")
+        return this.transaction(() => {
+            const vaults = vaultIds.map((id) => {
+                const vault = this.getVault(actor, id)
+                return { name: vault.name, items: vault.items.map(itemContent) }
+            })
+            const payload = {
+                format: "latamware-company-backup",
+                version: 1,
+                sourceId: randomUUID(),
+                exportedAt: new Date().toISOString(),
+                vaults
+            }
+            if (Buffer.byteLength(JSON.stringify(payload)) > 4 * 1024 * 1024)
+                throw new CompanyError(413, "The backup is too large. Select fewer vaults.")
+            for (let index = 0; index < vaultIds.length; index++)
+                this.audit(actor, "vault.exported", vaults[index].name, vaultIds[index])
+            return payload
+        })
     }
     private insertVault(actor: CompanyUser, name: string) {
         const id = randomUUID(),
@@ -251,7 +338,7 @@ export class CompanyStore {
             "owner",
             Date.now()
         )
-        this.audit(actor, "vault.created", id, id)
+        this.audit(actor, "vault.created", name, id)
         return this.summary(this.member(actor, id))
     }
     createVault(actor: CompanyUser, name: unknown) {
@@ -268,7 +355,7 @@ export class CompanyStore {
                 Date.now(),
                 id
             )
-            this.audit(actor, "vault.renamed", id, id)
+            this.audit(actor, "vault.renamed", String(name).trim(), id)
             return this.summary(this.member(actor, id))
         })
     }
@@ -277,7 +364,7 @@ export class CompanyStore {
             const row = this.member(actor, id, ["owner"])
             if (row.version !== version(expectedVersion))
                 throw new CompanyError(409, "This vault changed. Refresh it before saving.")
-            this.audit(actor, "vault.deleted", id, id)
+            this.audit(actor, "vault.deleted", row.name, id)
             this.run("DELETE FROM company_vaults WHERE id=?", id)
         })
     }
@@ -305,20 +392,29 @@ export class CompanyStore {
                 Date.now()
             )
             this.run("UPDATE company_vaults SET version=version+1,updated_at=? WHERE id=?", Date.now(), vaultId)
-            this.audit(actor, nextVersion === 1 ? "item.created" : "item.updated", id, vaultId)
+            this.audit(actor, nextVersion === 1 ? "item.created" : "item.updated", payload.title, vaultId)
             return { id, version: nextVersion }
         })
     }
     deleteItem(actor: CompanyUser, vaultId: string, id: string, expectedVersion: unknown) {
         this.transaction(() => {
-            this.member(actor, vaultId, ["owner", "admin", "editor"])
-            const current = this.one("SELECT version FROM company_items WHERE id=? AND vault_id=?", id, vaultId)
+            const vault = this.member(actor, vaultId, ["owner", "admin", "editor"])
+            const current = this.one("SELECT * FROM company_items WHERE id=? AND vault_id=?", id, vaultId)
             if (!current) throw new CompanyError(404, "Item no longer exists.")
             if (current.version !== version(expectedVersion))
                 throw new CompanyError(409, "This item changed. Refresh it before saving.")
+            const deleted = itemContent(
+                JSON.parse(
+                    decrypt(
+                        this.key(vault),
+                        JSON.parse(current.payload),
+                        `vault-item:${vaultId}:${id}:${current.version}`
+                    )
+                )
+            )
             this.run("DELETE FROM company_items WHERE id=? AND vault_id=?", id, vaultId)
             this.run("UPDATE company_vaults SET version=version+1,updated_at=? WHERE id=?", Date.now(), vaultId)
-            this.audit(actor, "item.deleted", id, vaultId)
+            this.audit(actor, "item.deleted", deleted.title, vaultId)
         })
     }
     listMembers(actor: CompanyUser, vaultId: string) {
@@ -327,7 +423,12 @@ export class CompanyStore {
             `SELECT m.id,coalesce(u.email,m.invited_email) AS email,m.role,m.user_id FROM company_members m
             LEFT JOIN company_users u ON u.id=m.user_id WHERE m.vault_id=? ORDER BY m.created_at`,
             vaultId
-        ).map((row) => ({ id: row.id, email: row.email, role: row.role, pending: row.user_id === null }))
+        ).map((row) => ({
+            id: row.id,
+            email: row.email,
+            role: row.role,
+            pending: row.user_id === null
+        }))
     }
     share(actor: CompanyUser, vaultId: string, emailValue: unknown, role: unknown, policy: AccessPolicy) {
         const email = normalizeEmail(text(emailValue, 254, true))
@@ -379,7 +480,11 @@ export class CompanyStore {
     }
     private auditRows(where = "", ...params: string[]) {
         return this.all(
-            `SELECT id,action,actor_email AS actor,target,created_at AS createdAt FROM company_audit ${where} ORDER BY id DESC LIMIT 200`,
+            `SELECT a.id,a.action,a.actor_email AS actor,
+            CASE WHEN a.action IN ('vault.created','vault.renamed','vault.imported','vault.recovered') AND a.target=a.vault_id
+            THEN coalesce((SELECT v.name FROM company_vaults v WHERE v.id=a.vault_id),a.target)
+            ELSE a.target END AS target,a.created_at AS createdAt
+            FROM company_audit a ${where} ORDER BY a.id DESC LIMIT 200`,
             ...params
         )
     }
@@ -425,8 +530,8 @@ export class CompanyStore {
     recoverVault(actor: CompanyUser, vaultId: string) {
         this.admin(actor)
         this.transaction(() => {
-            if (!this.one("SELECT id FROM company_vaults WHERE id=?", vaultId))
-                throw new CompanyError(404, "Vault not found or access was removed.")
+            const vault = this.one("SELECT name FROM company_vaults WHERE id=?", vaultId)
+            if (!vault) throw new CompanyError(404, "Vault not found or access was removed.")
             const existing = this.one(
                 "SELECT id,role FROM company_members WHERE vault_id=? AND user_id=?",
                 vaultId,
@@ -444,7 +549,7 @@ export class CompanyStore {
                     "admin",
                     Date.now()
                 )
-            this.audit(actor, "vault.recovered", vaultId, vaultId)
+            this.audit(actor, "vault.recovered", vault.name, vaultId)
         })
     }
     importLocal(actor: CompanyUser, input: any) {
@@ -454,7 +559,10 @@ export class CompanyStore {
         const vaults = input.vaults.map((vault: any) => {
             if (!Array.isArray(vault.items) || vault.items.length > 5000)
                 throw new CompanyError(400, "Invalid local import.")
-            return { name: text(vault.name, 160, true).trim(), items: vault.items.map(itemContent) }
+            return {
+                name: text(vault.name, 160, true).trim(),
+                items: vault.items.map(itemContent)
+            }
         })
         return this.transaction(() => {
             const previous = this.one(
@@ -462,7 +570,11 @@ export class CompanyStore {
                 actor.id,
                 sourceId
             )
-            if (previous) return { vaultIds: JSON.parse(previous.result) as string[], alreadyImported: true }
+            if (previous)
+                return {
+                    vaultIds: JSON.parse(previous.result) as string[],
+                    alreadyImported: true
+                }
             const ids: string[] = []
             for (const vault of vaults) {
                 const created = this.insertVault(actor, vault.name),
@@ -480,7 +592,7 @@ export class CompanyStore {
                         Date.now()
                     )
                 }
-                this.audit(actor, "vault.imported", created.id, created.id)
+                this.audit(actor, "vault.imported", created.name, created.id)
             }
             this.run(
                 "INSERT INTO company_imports(user_id,source_id,result) VALUES(?,?,?)",

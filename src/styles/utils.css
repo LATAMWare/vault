@@ -101,19 +101,6 @@
 
 /* Scroll */
 
-*::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-}
-
-*::-webkit-scrollbar-thumb {
-    @apply bg-white dark:bg-white rounded-full
-}
-
-*::-webkit-scrollbar-thumb:hover {
-    @apply bg-white dark:bg-white rounded-full
-}
-
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }

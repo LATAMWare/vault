@@ -7,6 +7,7 @@ export default function CompanyDialog({
     onClose,
     wide = false,
     navigation = false,
+    open = true,
     returnFocus
 }: {
     title: string
@@ -14,31 +15,60 @@ export default function CompanyDialog({
     onClose: () => void
     wide?: boolean
     navigation?: boolean
+    open?: boolean
     returnFocus?: HTMLElement | null
 }) {
     const ref = useRef<HTMLDialogElement>(null)
+    const lastFocus = useRef<HTMLElement | null>(null)
+    const hasOpened = useRef(false)
     const id = useId()
     const { t } = useI18n()
+    const restoreFocus = () => {
+        window.requestAnimationFrame(() => {
+            if (document.querySelector("dialog[open]")) return
+            const trigger = lastFocus.current
+            if (trigger?.isConnected && !trigger.hasAttribute("disabled")) trigger.focus()
+            else document.querySelector<HTMLElement>("[data-company-mobile-menu]")?.focus()
+        })
+    }
     useEffect(() => {
         const dialog = ref.current!
-        dialog.showModal()
-        dialog
-            .querySelector<HTMLElement>(
-                "[data-dialog-autofocus],input:not([type=hidden]):not([type=radio]):not([type=checkbox]):not([disabled]),textarea:not([disabled]),select:not([disabled])"
-            )
-            ?.focus()
-        const trigger = returnFocus ?? (document.activeElement as HTMLElement | null)
+        let timer: ReturnType<typeof setTimeout> | undefined
+        if (open) {
+            lastFocus.current = returnFocus ?? (document.activeElement as HTMLElement | null)
+            hasOpened.current = true
+            dialog.removeAttribute("data-closing")
+            if (!dialog.open) dialog.showModal()
+            dialog
+                .querySelector<HTMLElement>(
+                    "[data-dialog-autofocus],input:not([type=hidden]):not([type=radio]):not([type=checkbox]):not([disabled]),textarea:not([disabled]),select:not([disabled])"
+                )
+                ?.focus()
+        } else if (dialog.open) {
+            const finish = () => {
+                dialog.close()
+                dialog.removeAttribute("data-closing")
+                hasOpened.current = false
+                restoreFocus()
+            }
+            if (navigation && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+                dialog.setAttribute("data-closing", "true")
+                timer = setTimeout(finish, 200)
+            } else finish()
+        }
+        return () => clearTimeout(timer)
+    }, [open])
+    useEffect(() => {
+        const dialog = ref.current!
         return () => {
             if (dialog.open) dialog.close()
-            window.requestAnimationFrame(() => {
-                if (trigger?.isConnected && !trigger.hasAttribute("disabled")) trigger.focus()
-                else document.querySelector<HTMLElement>("[data-company-mobile-menu]")?.focus()
-            })
+            if (hasOpened.current) restoreFocus()
         }
     }, [])
     return (
         <dialog
             ref={ref}
+            id={navigation ? "company-mobile-navigation" : undefined}
             className={`cw-dialog ${wide ? "cw-dialog-wide" : ""} ${navigation ? "cw-navigation-dialog" : ""}`}
             aria-labelledby={id}
             onKeyDown={(event) => {

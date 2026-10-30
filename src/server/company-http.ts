@@ -69,6 +69,10 @@ export async function companyHandler(context: APIContext): Promise<Response> {
                 result = { ok: true }
             } else if (parts[2] === "items" && parts.length === 3 && method === "POST")
                 result = store.saveItem(actor, id, body.content)
+            else if (parts[2] === "items" && parts.length === 5 && parts[4] === "pin" && method === "POST")
+                result = store.setPinned(actor, id, parts[3], body.pinned)
+            else if (parts[2] === "items" && parts.length === 5 && parts[4] === "copy" && method === "POST")
+                result = store.copyItem(actor, id, parts[3], body.field)
             else if (parts[2] === "items" && parts.length === 4 && method === "PATCH")
                 result = store.saveItem(actor, id, body.content, parts[3], body.version)
             else if (parts[2] === "items" && parts.length === 4 && method === "DELETE") {
@@ -84,7 +88,8 @@ export async function companyHandler(context: APIContext): Promise<Response> {
             } else if (parts[2] === "audit" && parts.length === 3 && method === "GET")
                 result = store.getAudit(actor, id)
             else throw new CompanyError(404, "Not found.")
-        } else if (parts.join("/") === "import" && method === "POST") result = store.importLocal(actor, body)
+        } else if (parts.join("/") === "export" && method === "POST") result = store.exportData(actor, body.vaultIds)
+        else if (parts.join("/") === "import" && method === "POST") result = store.importLocal(actor, body)
         else if (parts.join("/") === "me/revoke-sessions" && method === "POST") {
             store.revokeSessions(actor)
             result = { ok: true }
@@ -104,7 +109,12 @@ export async function companyHandler(context: APIContext): Promise<Response> {
             else throw new CompanyError(404, "Not found.")
             result = { ok: true }
         } else throw new CompanyError(404, "Not found.")
-        return Response.json(result, { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } })
+        return Response.json(result, {
+            headers: {
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff"
+            }
+        })
     } catch (error) {
         const status = error instanceof CompanyError ? error.status : 500
         return Response.json(
@@ -113,7 +123,10 @@ export async function companyHandler(context: APIContext): Promise<Response> {
             },
             {
                 status,
-                headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
+                headers: {
+                    "Cache-Control": "no-store",
+                    "X-Content-Type-Options": "nosniff"
+                }
             }
         )
     }

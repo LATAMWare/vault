@@ -140,8 +140,6 @@
 .cw-nav-list {
     min-height: 0;
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #ffffff18 transparent;
 }
 .cw-sidebar-bottom {
     margin-top: auto;
@@ -215,8 +213,6 @@
     border-radius: 18px;
     background: rgba(21, 19, 30, 0.72);
     backdrop-filter: blur(22px);
-    scrollbar-width: thin;
-    scrollbar-color: #ffffff18 transparent;
 }
 .cw-topbar {
     position: sticky;
@@ -629,6 +625,107 @@
     gap: 2px;
     flex-shrink: 0;
 }
+.cw-pin-button[aria-pressed="true"] {
+    color: #cfb8ff;
+    background: #b99aef17;
+}
+.cw-item-description h3 {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.cw-pinned-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #c4a7f2;
+    font-size: 10px;
+    font-weight: 500;
+}
+.cw-transfer-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+}
+.cw-transfer-switch .cw-button {
+    flex: 1;
+    padding: 10px 12px;
+    white-space: nowrap;
+}
+.cw-transfer-switch [aria-pressed="true"] {
+    color: #e9dcff;
+    border-color: #b89ce27a;
+    background: #b89ce21a;
+}
+.cw-transfer-guide {
+    padding-left: 22px;
+    margin: 0 0 18px;
+    color: #d6cae3;
+    font-size: 13px;
+    line-height: 1.65;
+    list-style: decimal;
+}
+.cw-transfer-guide li + li {
+    margin-top: 8px;
+}
+.cw-transfer-empty {
+    padding: 16px;
+    border-radius: 10px;
+    background: #b89ce210;
+    color: #cabdd8;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.cw-transfer-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.cw-transfer-check input {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: #bea2f0;
+}
+.cw-transfer-check small {
+    margin-left: auto;
+    color: #a89ab7;
+    white-space: nowrap;
+}
+.cw-transfer-vaults {
+    border: 1px solid var(--cw-line);
+    border-radius: 10px;
+    padding: 12px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+.cw-transfer-vaults legend {
+    padding: 0 6px;
+    font-size: 13px;
+    color: #d6cae3;
+}
+.cw-transfer-vaults label + label {
+    margin-top: 12px;
+}
+@media (max-width: 640px) {
+    .cw-item-actions {
+        flex-wrap: wrap;
+        max-width: 100%;
+    }
+    .cw-item-value {
+        display: none;
+    }
+    .cw-item-value.cw-item-value-revealed {
+        display: block;
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+}
 .cw-item-expanded {
     border-top: 1px solid var(--cw-line);
     padding: 16px 22px;
@@ -1039,6 +1136,13 @@
 .cw-table-wrap {
     overflow: auto;
 }
+.cw-audit-table {
+    min-width: 600px;
+}
+.cw-audit-table td:first-child,
+.cw-audit-table td:nth-child(3) {
+    white-space: nowrap;
+}
 .cw-table {
     width: 100%;
     text-align: left;
@@ -1102,11 +1206,40 @@
     color: #97809f;
     margin-top: 5px;
 }
-.cw-navigation-dialog {
-    margin: 12px auto 12px 12px;
-    width: min(310px, calc(100vw - 24px));
-    height: calc(100dvh - 24px);
+.cw-dialog.cw-navigation-dialog {
+    margin: 0;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
     max-height: none;
+    border: 0;
+    border-radius: 0;
+    animation: cw-navigation-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.cw-navigation-dialog[data-closing] {
+    animation: cw-navigation-out 200ms ease-in both;
+    pointer-events: none;
+}
+@keyframes cw-navigation-in {
+    from {
+        opacity: 0;
+        transform: translateX(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+@keyframes cw-navigation-out {
+    from {
+        opacity: 1;
+        transform: none;
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-100%);
+    }
 }
 .cw-navigation-dialog .cw-dialog-panel {
     height: 100%;
@@ -1114,7 +1247,9 @@
     flex-direction: column;
 }
 .cw-navigation-dialog .cw-sidebar {
-    height: 100%;
+    height: auto;
+    flex: 1;
+    min-height: 0;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -1316,6 +1451,9 @@
     }
 }
 @media (prefers-reduced-motion: reduce) {
+    .cw-dialog.cw-navigation-dialog {
+        animation: none;
+    }
     .cw-shell *,
     .cw-dialog * {
         animation: none !important;

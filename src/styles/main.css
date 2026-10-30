@@ -6,6 +6,7 @@
 @import "./form.css";
 @import "./company.css";
 @import "./language-selector.css";
+@import "./interactions.css";
 
 
 body, html {

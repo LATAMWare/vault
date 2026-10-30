@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { lazy, Suspense, useEffect, useRef } from "react"
 import Dropdown from "@component/global/dropdown"
 import LanguageSelector from "@component/global/language-selector"
 import { companyApi } from "@logic/company-client"
@@ -6,9 +6,14 @@ import type { AuditEntry, CompanyMember } from "../../interfaces/company"
 import type { AdminData, CompanyController } from "./controller"
 import CompanyDialog from "./dialog"
 import CompanyItemForm from "./item-form"
-import CompanyMigration from "./migration"
+const CompanyMigration = lazy(() => import("./migration"))
 
-const roleNames = { owner: "Owner", admin: "Manage access", editor: "Edit", reader: "Read only" } as const
+const roleNames = {
+    owner: "Owner",
+    admin: "Manage access",
+    editor: "Edit",
+    reader: "Read only"
+} as const
 const auditNames: Record<string, string> = {
     "user.joined": "User joined",
     "vault.created": "Vault created",
@@ -17,6 +22,10 @@ const auditNames: Record<string, string> = {
     "item.created": "Item created",
     "item.updated": "Item updated",
     "item.deleted": "Item deleted",
+    "item.password_copy_requested": "Password copy requested",
+    "item.username_copy_requested": "Username copy requested",
+    "item.notes_copy_requested": "Note copy requested",
+    "vault.exported": "Vault export requested",
     "member.granted": "Access granted or updated",
     "member.removed": "Access removed",
     "sessions.revoked": "Sessions closed",
@@ -50,20 +59,23 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
         vault.name.toLocaleLowerCase().includes(c.query.toLocaleLowerCase())
     )
     const filteredItems =
-        c.vault?.items.filter((item) =>
-            [item.title, item.username, item.url].some((value) =>
-                value.toLocaleLowerCase().includes(c.query.toLocaleLowerCase())
+        c.vault?.items
+            .filter((item) =>
+                [item.title, item.username, item.url].some((value) =>
+                    value.toLocaleLowerCase().includes(c.query.toLocaleLowerCase())
+                )
             )
-        ) ?? []
+            .toSorted((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned))) ?? []
     const table = (entries: AuditEntry[]) => (
-        <div className="cw-table-wrap">
-            <table className="cw-table">
+        <div className="cw-table-wrap" role="region" aria-label={t("Activity")} tabIndex={0}>
+            <table className="cw-table cw-audit-table">
                 <caption className="sr-only">{t("Activity")}</caption>
                 <thead>
                     <tr>
                         <th scope="col">{t("Date")}</th>
                         <th scope="col">{t("Action")}</th>
                         <th scope="col">{t("User")}</th>
+                        <th scope="col">{t("Affected item")}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -72,6 +84,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                             <td>{new Date(entry.createdAt).toLocaleString(c.language)}</td>
                             <td>{t(auditNames[entry.action] ?? entry.action)}</td>
                             <td>{entry.actor}</td>
+                            <td>{entry.target}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -140,7 +153,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                     }}
                 >
                     <Icon name="archive" />
-                    <span>{t("Import previous local data")}</span>
+                    <span>{t("Import and export")}</span>
                 </button>
                 <div className="cw-language">
                     <span className="cw-language-label">
@@ -214,6 +227,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                         data-company-mobile-menu
                         aria-label={t("Open menu")}
                         aria-expanded={c.mobileNav}
+                        aria-controls="company-mobile-navigation"
                         onClick={() => c.setMobileNav(true)}
                     >
                         <Icon name="menu-2" />
@@ -342,7 +356,9 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                                                 await companyApi(
                                                                                     `/admin/users/${encodeURIComponent(user.id)}/status`,
                                                                                     "POST",
-                                                                                    { disabled: !user.disabled }
+                                                                                    {
+                                                                                        disabled: !user.disabled
+                                                                                    }
                                                                                 )
                                                                                 c.setAdminData(
                                                                                     await companyApi<AdminData>(
@@ -637,7 +653,15 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                             <Icon name={item.kind === "note" ? "file-text" : "key"} />
                                                         </span>
                                                         <div className="cw-item-description">
-                                                            <h3>{item.title}</h3>
+                                                            <h3>
+                                                                {item.title}
+                                                                {item.pinned && (
+                                                                    <span className="cw-pinned-label">
+                                                                        <Icon name="pinned" />
+                                                                        {t("Pinned")}
+                                                                    </span>
+                                                                )}
+                                                            </h3>
                                                             <p>
                                                                 {item.username ||
                                                                     (item.kind === "note"
@@ -645,18 +669,37 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                                         : item.url || t("Password"))}
                                                             </p>
                                                         </div>
-                                                        <span className="cw-item-value">
+                                                        <span
+                                                            className={`cw-item-value ${c.revealed.includes(item.id) ? "cw-item-value-revealed" : ""}`}
+                                                        >
                                                             {item.kind === "password" && c.revealed.includes(item.id)
                                                                 ? item.password
                                                                 : "••••••••••••"}
                                                         </span>
                                                         <div className="cw-item-actions">
                                                             <button
+                                                                className="cw-icon-button cw-pin-button"
+                                                                aria-label={t(
+                                                                    item.pinned ? "Unpin {{name}}" : "Pin {{name}}",
+                                                                    { name: item.title }
+                                                                )}
+                                                                title={t(item.pinned ? "Unpin" : "Pin")}
+                                                                aria-pressed={Boolean(item.pinned)}
+                                                                disabled={c.busy}
+                                                                onClick={() => void c.pinItem(item)}
+                                                            >
+                                                                <Icon name={item.pinned ? "pinned" : "pin"} />
+                                                            </button>
+                                                            <button
                                                                 className="cw-icon-button"
                                                                 aria-label={
                                                                     c.revealed.includes(item.id)
-                                                                        ? t("Hide {{name}}", { name: item.title })
-                                                                        : t("Show {{name}}", { name: item.title })
+                                                                        ? t("Hide {{name}}", {
+                                                                              name: item.title
+                                                                          })
+                                                                        : t("Show {{name}}", {
+                                                                              name: item.title
+                                                                          })
                                                                 }
                                                                 title={
                                                                     c.revealed.includes(item.id) ? t("Hide") : t("Show")
@@ -678,18 +721,35 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                             </button>
                                                             <button
                                                                 className="cw-icon-button"
-                                                                aria-label={t("Copy {{name}}", { name: item.title })}
-                                                                title={t("Copy")}
+                                                                aria-label={t("Copy {{name}}", {
+                                                                    name: item.title
+                                                                })}
+                                                                title={t(
+                                                                    item.kind === "password"
+                                                                        ? "Copy password"
+                                                                        : "Copy note"
+                                                                )}
                                                                 onClick={() => {
-                                                                    void c.copy(
-                                                                        item.kind === "password"
-                                                                            ? item.password
-                                                                            : item.notes
+                                                                    void c.copyItem(
+                                                                        item,
+                                                                        item.kind === "password" ? "password" : "notes"
                                                                     )
                                                                 }}
                                                             >
                                                                 <Icon name="copy" />
                                                             </button>
+                                                            {item.kind === "password" && item.username && (
+                                                                <button
+                                                                    className="cw-icon-button"
+                                                                    aria-label={t("Copy username for {{name}}", {
+                                                                        name: item.title
+                                                                    })}
+                                                                    title={t("Copy username")}
+                                                                    onClick={() => void c.copyItem(item, "username")}
+                                                                >
+                                                                    <Icon name="user" />
+                                                                </button>
+                                                            )}
                                                             {c.canEdit && (
                                                                 <Dropdown
                                                                     className="cw-menu"
@@ -732,7 +792,9 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                                                         await companyApi(
                                                                                             `/vaults/${c.activeId}/items/${item.id}`,
                                                                                             "DELETE",
-                                                                                            { version: item.version }
+                                                                                            {
+                                                                                                version: item.version
+                                                                                            }
                                                                                         )
                                                                                         await c.refresh()
                                                                                     }
@@ -789,16 +851,15 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                     </button>
                 </div>
             )}
-            {c.mobileNav && (
-                <CompanyDialog
-                    returnFocus={invoker.current}
-                    title="LATAMWare Vault"
-                    navigation
-                    onClose={() => c.setMobileNav(false)}
-                >
-                    {sidebar}
-                </CompanyDialog>
-            )}
+            <CompanyDialog
+                open={c.mobileNav}
+                returnFocus={invoker.current}
+                title="LATAMWare Vault"
+                navigation
+                onClose={() => c.setMobileNav(false)}
+            >
+                {sidebar}
+            </CompanyDialog>
             {c.newVault && (
                 <CompanyDialog
                     returnFocus={invoker.current}
@@ -995,7 +1056,9 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                             <select
                                                 className="cw-input"
                                                 value={member.role}
-                                                aria-label={t("Permission for {{email}}", { email: member.email })}
+                                                aria-label={t("Permission for {{email}}", {
+                                                    email: member.email
+                                                })}
                                                 disabled={c.busy}
                                                 onChange={(event) => {
                                                     const role = event.target.value
@@ -1017,7 +1080,9 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                             </select>
                                             <button
                                                 className="cw-icon-button"
-                                                aria-label={t("Remove access for {{email}}", { email: member.email })}
+                                                aria-label={t("Remove access for {{email}}", {
+                                                    email: member.email
+                                                })}
                                                 title={t("Remove access")}
                                                 disabled={c.busy}
                                                 onClick={() =>
@@ -1068,16 +1133,31 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                     wide
                     onClose={() => c.setAudit(null)}
                 >
-                    <div className="cw-dialog-body">{table(c.audit)}</div>
+                    <div className="cw-dialog-body">
+                        <p className="cw-dialog-description">
+                            {t(
+                                "Shows the latest 200 events. Copy events record requests from this app; the browser may block the clipboard. Actions outside this app cannot be tracked."
+                            )}
+                        </p>
+                        {table(c.audit)}
+                    </div>
                 </CompanyDialog>
             )}
             {c.importing && (
                 <CompanyDialog
                     returnFocus={invoker.current}
-                    title={t("Import previous local data")}
+                    title={t("Import and export")}
                     onClose={() => c.setImporting(false)}
                 >
-                    <CompanyMigration onDone={c.refresh} onClose={() => c.setImporting(false)} />
+                    <Suspense
+                        fallback={
+                            <p className="cw-dialog-body" role="status">
+                                {t("Loading…")}
+                            </p>
+                        }
+                    >
+                        <CompanyMigration vaults={c.vaults} onDone={c.refresh} onClose={() => c.setImporting(false)} />
+                    </Suspense>
                 </CompanyDialog>
             )}
             {c.confirmation && (

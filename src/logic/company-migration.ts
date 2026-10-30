@@ -43,6 +43,14 @@ export async function prepareLocalMigration(accountId: string, password: string)
         throw new Error(
             t("This account cannot verify the old master password. Verify it in local mode before importing.")
         )
+    return materializeLocalAccount(account, accountId, password)
+}
+
+async function materializeLocalAccount(
+    account: ReturnType<typeof validateAccountData>,
+    sourceId: string,
+    password: string
+) {
     const vaults = []
     for (const vault of account.vaults) {
         const items: ItemContent[] = []
@@ -73,5 +81,18 @@ export async function prepareLocalMigration(accountId: string, password: string)
         }
         vaults.push({ name: vault.name, items })
     }
-    return { sourceId: accountId, vaults }
+    return { sourceId, vaults }
+}
+
+/** An encrypted file authenticates the old password without restoring or changing browser storage. */
+export async function prepareLocalBackup(encrypted: string, password: string) {
+    try {
+        const account = validateAccountData(JSON.parse(await decodeData(password, encrypted)))
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(encrypted))
+        const sourceId =
+            "local-file-" + Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
+        return await materializeLocalAccount(account, sourceId, password)
+    } catch {
+        throw new Error(t("Could not open the backup. Check its password and file."))
+    }
 }

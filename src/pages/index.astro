@@ -5,10 +5,13 @@ import Layout from "@layout/home.layout.astro"
 import Home from "@component/page/index"
 import Background from "@component/global/background"
 import Company from "@component/company"
+import { getCompanyStore } from "../server/company-store"
+
+const initialVaults = Astro.locals.companyUser ? getCompanyStore().listVaults(Astro.locals.companyUser) : undefined
 
 ---
 
 <Layout>
 	<Background client:load />
-	{Astro.locals.companyUser ? <Company user={Astro.locals.companyUser} client:load /> : <Home client:load />}
+	{Astro.locals.companyUser ? <Company user={Astro.locals.companyUser} initialVaults={initialVaults} client:load /> : <Home client:load />}
 </Layout>

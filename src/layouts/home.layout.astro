@@ -67,5 +67,11 @@
         </script>
         <script is:inline set:html={`window.__VAULT_CONFIG__ = ${runtimeConfig};`} />
 	    <slot />
+        <script>
+            import { installTooltips } from "../logic/tooltips"
+            let cleanup = installTooltips()
+            window.addEventListener("pagehide", () => cleanup())
+            window.addEventListener("pageshow", (event) => { if (event.persisted) cleanup = installTooltips() })
+        </script>
 	</body>
 </html>

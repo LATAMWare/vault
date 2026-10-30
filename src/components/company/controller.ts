@@ -6,6 +6,7 @@ import type {
     CompanyMember,
     CompanyUser,
     CompanyVault,
+    CompanyItem,
     ItemContent,
     VaultDetail
 } from "../../interfaces/company"
@@ -24,13 +25,13 @@ export type Confirmation = {
     action: () => Promise<void>
 }
 
-export function useCompany(user: CompanyUser) {
+export function useCompany(user: CompanyUser, initialVaults?: CompanyVault[]) {
     const { language, t } = useI18n()
     const [me, setMe] = useState(user)
-    const [vaults, setVaults] = useState<CompanyVault[]>([])
+    const [vaults, setVaults] = useState<CompanyVault[]>(initialVaults ?? [])
     const [activeId, setActiveId] = useState("")
     const [vault, setVault] = useState<VaultDetail | null>(null)
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(initialVaults === undefined)
     const [busy, setBusy] = useState(false)
     const [error, setError] = useState("")
     const [notice, setNotice] = useState("")
@@ -55,6 +56,8 @@ export function useCompany(user: CompanyUser) {
     const sequence = useRef(0)
     const alive = useRef(true)
     const performing = useRef(false)
+    const polling = useRef(false)
+    const indexRequest = useRef(0)
     const canEdit = Boolean(vault && ["owner", "admin", "editor"].includes(vault.role))
     const canManage = Boolean(vault && ["owner", "admin"].includes(vault.role))
 
@@ -82,8 +85,12 @@ export function useCompany(user: CompanyUser) {
         setError(reason instanceof Error ? reason.message : "Could not complete the operation. Please retry.")
     }
     const refreshIndex = async () => {
-        const data = await companyApi<{ me: CompanyUser; vaults: CompanyVault[] }>()
-        if (!alive.current) return
+        const request = ++indexRequest.current
+        const data = await companyApi<{
+            me: CompanyUser
+            vaults: CompanyVault[]
+        }>()
+        if (!alive.current || request !== indexRequest.current) return
         if (data.me.id !== user.id) throw new CompanyApiError(401, "Please sign in again.")
         setMe(data.me)
         setVaults(data.vaults)
@@ -106,11 +113,14 @@ export function useCompany(user: CompanyUser) {
         }
     }
     const refresh = async () => {
-        await refreshIndex()
-        if (selected.current) await refreshVault(selected.current)
-        if (adminOpen) setAdminData(await companyApi<AdminData>("/admin"))
+        await Promise.all([
+            refreshIndex(),
+            selected.current ? refreshVault(selected.current) : Promise.resolve(),
+            adminOpen ? companyApi<AdminData>("/admin").then(setAdminData) : Promise.resolve()
+        ])
     }
     useEffect(() => {
+        if (initialVaults !== undefined) return
         let active = true
         void refreshIndex()
             .catch((reason) => {
@@ -136,14 +146,20 @@ export function useCompany(user: CompanyUser) {
     }, [activeId])
     useEffect(() => {
         const poll = async () => {
+            if (polling.current || performing.current || document.visibilityState === "hidden") return
+            polling.current = true
             try {
                 await refresh()
             } catch (reason) {
+                sequence.current++
+                indexRequest.current++
                 setVault(null)
                 setEditing(null)
                 setMembers([])
                 setAdminData(null)
                 failed(reason)
+            } finally {
+                polling.current = false
             }
         }
         const focus = () => {
@@ -186,7 +202,9 @@ export function useCompany(user: CompanyUser) {
     }
     const createVault = async () =>
         perform(async () => {
-            const created = await companyApi<CompanyVault>("/vaults", "POST", { name: vaultName })
+            const created = await companyApi<CompanyVault>("/vaults", "POST", {
+                name: vaultName
+            })
             await refreshIndex()
             selectVault(created.id)
             setVaultName("")
@@ -202,14 +220,32 @@ export function useCompany(user: CompanyUser) {
             setEditing(null)
             await refresh()
         })
-    const copy = async (value: string) => {
+    const copyItem = async (item: CompanyItem, field: "username" | "password" | "notes") => {
         try {
+            const { value } = await companyApi<{ value: string }>(`/vaults/${activeId}/items/${item.id}/copy`, "POST", {
+                field
+            })
             await navigator.clipboard.writeText(value)
             setNotice(t("Copied to clipboard."))
-        } catch {
-            failed(new Error("Could not copy. Please retry."))
+        } catch (reason) {
+            failed(reason instanceof CompanyApiError ? reason : new Error("Could not copy. Please retry."))
         }
     }
+    const pinItem = async (item: CompanyItem) =>
+        perform(async () => {
+            const id = activeId
+            const { pinned } = await companyApi<{ pinned: boolean }>(`/vaults/${id}/items/${item.id}/pin`, "POST", {
+                pinned: !item.pinned
+            })
+            if (selected.current === id)
+                setVault(
+                    (current) =>
+                        current && {
+                            ...current,
+                            items: current.items.map((value) => (value.id === item.id ? { ...value, pinned } : value))
+                        }
+                )
+        })
     const loadMembers = async () => {
         setMembers(await companyApi<CompanyMember[]>(`/vaults/${activeId}/members`))
         setSharing(true)
@@ -281,7 +317,8 @@ export function useCompany(user: CompanyUser) {
         selectVault,
         createVault,
         saveItem,
-        copy,
+        copyItem,
+        pinItem,
         loadMembers,
         openAdmin,
         openNewVault,
