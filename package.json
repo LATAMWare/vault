@@ -30,7 +30,8 @@
     "test:auth:http": "node --import tsx tests/corporate-http.mjs",
     "company:backup": "node scripts/company-backup.mjs",
     "check": "astro check",
-    "validate": "pnpm check && pnpm test && pnpm build"
+    "validate": "pnpm check && pnpm test && pnpm build",
+    "company:audit:verify": "node scripts/audit-verify.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.9",
@@ -42,6 +43,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitrified/typescript-opentimestamps": "0.2.2",
     "astro": "^7.4.4",
     "i18next": "^26.5.11",
     "random-seed": "^0.3.0",

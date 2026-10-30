@@ -6,7 +6,8 @@ export default function Dropdown({
     children,
     className = "",
     triggerClassName = "",
-    onKeyDown
+    onKeyDown,
+    popupRole
 }: {
     label: string
     trigger: ReactNode
@@ -14,6 +15,7 @@ export default function Dropdown({
     className?: string
     triggerClassName?: string
     onKeyDown?: (event: KeyboardEvent<HTMLDetailsElement>) => void
+    popupRole?: "listbox" | "menu"
 }) {
     const ref = useRef<HTMLDetailsElement>(null)
     const panelId = useId()
@@ -57,7 +59,7 @@ export default function Dropdown({
                 if (target.closest("button,a") && !target.closest("summary")) event.currentTarget.open = false
             }}
         >
-            <summary className={triggerClassName} aria-label={label} aria-controls={panelId}>
+            <summary className={triggerClassName} aria-label={label} aria-controls={panelId} aria-haspopup={popupRole}>
                 {trigger}
             </summary>
             <div id={panelId}>{children}</div>

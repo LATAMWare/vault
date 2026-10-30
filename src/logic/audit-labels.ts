@@ -1,0 +1,21 @@
+export const auditNames: Record<string, string> = {
+    "user.joined": "User joined",
+    "vault.created": "Vault created",
+    "vault.renamed": "Vault renamed",
+    "vault.deleted": "Vault deleted",
+    "item.created": "Item created",
+    "item.updated": "Item updated",
+    "item.deleted": "Item deleted",
+    "item.password_copy_requested": "Password copy requested",
+    "item.username_copy_requested": "Username copy requested",
+    "item.notes_copy_requested": "Note copy requested",
+    "vault.exported": "Vault export requested",
+    "member.granted": "Access granted or updated",
+    "member.removed": "Access removed",
+    "sessions.revoked": "Sessions closed",
+    "user.disabled": "User disabled",
+    "user.enabled": "User enabled",
+    "vault.recovered": "Administrator recovered access",
+    "vault.imported": "Local vault imported",
+    "keys.rotated": "Vault key protection updated"
+}

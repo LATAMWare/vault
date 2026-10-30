@@ -8,6 +8,7 @@ export default function CompanyDialog({
     wide = false,
     navigation = false,
     open = true,
+    autoFocusField = true,
     returnFocus
 }: {
     title: string
@@ -16,6 +17,7 @@ export default function CompanyDialog({
     wide?: boolean
     navigation?: boolean
     open?: boolean
+    autoFocusField?: boolean
     returnFocus?: HTMLElement | null
 }) {
     const ref = useRef<HTMLDialogElement>(null)
@@ -39,11 +41,12 @@ export default function CompanyDialog({
             hasOpened.current = true
             dialog.removeAttribute("data-closing")
             if (!dialog.open) dialog.showModal()
-            dialog
-                .querySelector<HTMLElement>(
-                    "[data-dialog-autofocus],input:not([type=hidden]):not([type=radio]):not([type=checkbox]):not([disabled]),textarea:not([disabled]),select:not([disabled])"
-                )
-                ?.focus()
+            if (autoFocusField)
+                dialog
+                    .querySelector<HTMLElement>(
+                        "[data-dialog-autofocus],input:not([type=hidden]):not([type=radio]):not([type=checkbox]):not([disabled]),textarea:not([disabled]),select:not([disabled])"
+                    )
+                    ?.focus()
         } else if (dialog.open) {
             const finish = () => {
                 dialog.close()
@@ -72,6 +75,7 @@ export default function CompanyDialog({
             className={`cw-dialog ${wide ? "cw-dialog-wide" : ""} ${navigation ? "cw-navigation-dialog" : ""}`}
             aria-labelledby={id}
             onKeyDown={(event) => {
+                if ((event.target as HTMLElement).closest("dialog") !== event.currentTarget) return
                 if (event.key !== "Tab") return
                 const items = Array.from(
                     event.currentTarget.querySelectorAll<HTMLElement>(
@@ -90,6 +94,7 @@ export default function CompanyDialog({
             }}
             onCancel={(event) => {
                 event.preventDefault()
+                event.stopPropagation()
                 onClose()
             }}
             onClick={(event) => {

@@ -116,7 +116,7 @@ test('existing schema v1 databases upgrade in place without changing encrypted i
     const payload = store.db.prepare('SELECT payload FROM company_items WHERE id=?').get(saved.id).payload
     store.db.exec('DROP TABLE company_pins; PRAGMA user_version=1;')
     const upgraded = f.reopen()
-    assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version, 2)
+    assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version, 3)
     assert.equal(upgraded.db.prepare('SELECT payload FROM company_items WHERE id=?').get(saved.id).payload, payload)
     assert.equal(upgraded.getVault(alice, vault.id).items[0].password, content().password)
     assert.equal(upgraded.getVault(alice, vault.id).items[0].pinned, false)

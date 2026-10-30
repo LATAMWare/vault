@@ -10,17 +10,26 @@ export class CompanyApiError extends Error {
 }
 
 export async function companyApi<T>(path = "", method = "GET", body?: unknown, signal?: AbortSignal): Promise<T> {
-    const response = await fetch(`/api/company${path}`, {
-        method,
-        cache: "no-store",
-        signal,
-        ...(method !== "GET"
-            ? {
-                  headers: { "Content-Type": "application/json", "X-Vault-Request": "1" },
-                  body: JSON.stringify(body ?? {})
-              }
-            : {})
-    })
+    let response: Response
+    try {
+        response = await fetch(`/api/company${path}`, {
+            method,
+            cache: "no-store",
+            signal,
+            ...(method !== "GET"
+                ? {
+                      headers: { "Content-Type": "application/json", "X-Vault-Request": "1" },
+                      body: JSON.stringify(body ?? {})
+                  }
+                : {})
+        })
+    } catch (error) {
+        if (signal?.aborted) throw error
+        throw new CompanyApiError(
+            0,
+            "Connection to Vault was interrupted. Check your connection and retry. The operation may have completed; refresh before trying again."
+        )
+    }
     const data = await response.json().catch(() => null)
     if (!response.ok)
         throw new CompanyApiError(

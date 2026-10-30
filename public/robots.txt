@@ -1,5 +1,17 @@
 User-agent: *
+# Public HTML must be crawlable so search engines can process its noindex directive.
 Allow: /
+Disallow: /api/
+Disallow: /_astro/
+Disallow: /libs/
+Disallow: /fonts/
+Disallow: /icons/
+Disallow: /images/
+Disallow: /sw.js
+Disallow: /manifest.webmanifest
+Disallow: /sitemap.xml
+Disallow: /sitemap_index.xml
+Disallow: /sitemap-index.xml
 
 # Block AI content scrapers
 User-agent: 008

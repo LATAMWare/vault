@@ -25,6 +25,11 @@ store.saveItem(admin, infra.id, { ...defaults, kind: 'note', title: 'Procedimien
 store.saveItem(admin, clients.id, { ...defaults, title: 'Portal de clientes' })
 store.share(admin, infra.id, reader.email, 'reader', parseAccessPolicy('latamware.test', ''))
 store.share(admin, clients.id, reader.email, 'editor', parseAccessPolicy('latamware.test', ''))
+// Synthetic historical events exercise pagination without using real company activity.
+store.db.exec('BEGIN')
+for (let index = 0; index < 235; index++) store.db.prepare('INSERT INTO company_audit(vault_id,actor_id,actor_email,action,target,created_at) VALUES(?,?,?,?,?,?)')
+    .run(infra.id, reader.id, reader.email, 'item.updated', `Revisión de prueba ${index + 1}`, Date.now() - (236 - index) * 60000)
+store.db.exec('COMMIT')
 store.close()
 const socket = createSocket().listen(0, '127.0.0.1')
 await once(socket, 'listening')

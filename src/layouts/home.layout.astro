@@ -22,6 +22,12 @@
 
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width" />
+        <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+        <meta name="theme-color" content="#1e1927" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="LATAMWare Vault" />
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="apple-touch-icon" href="/icons/vault-192.png" />
 
         <title>{ meta.title }</title>
         <meta name="description" content={ meta.description } />
@@ -69,6 +75,8 @@
 	    <slot />
         <script>
             import { installTooltips } from "../logic/tooltips"
+            import { setupPwa } from "../logic/pwa"
+            setupPwa()
             let cleanup = installTooltips()
             window.addEventListener("pagehide", () => cleanup())
             window.addEventListener("pageshow", (event) => { if (event.persisted) cleanup = installTooltips() })

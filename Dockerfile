@@ -27,6 +27,8 @@ RUN pnpm install --prod --frozen-lockfile
 COPY --from=build /app/dist ./dist
 COPY scripts/company-backup.mjs ./scripts/company-backup.mjs
 COPY scripts/private-env.mjs ./scripts/private-env.mjs
+COPY scripts/audit-verify.mjs ./scripts/audit-verify.mjs
+COPY src/server/audit-ots.ts ./src/server/audit-ots.ts
 
 RUN mkdir -p /app/data && chown node:node /app/data
 

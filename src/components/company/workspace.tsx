@@ -1,11 +1,14 @@
 import { lazy, Suspense, useEffect, useRef } from "react"
 import Dropdown from "@component/global/dropdown"
 import LanguageSelector from "@component/global/language-selector"
+import InstallApp from "@component/global/install-app"
 import { companyApi } from "@logic/company-client"
-import type { AuditEntry, CompanyMember } from "../../interfaces/company"
+import type { CompanyMember } from "../../interfaces/company"
 import type { AdminData, CompanyController } from "./controller"
 import CompanyDialog from "./dialog"
 import CompanyItemForm from "./item-form"
+import AuditIntegrity from "./audit-integrity"
+import ActivityFeed from "./activity-feed"
 const CompanyMigration = lazy(() => import("./migration"))
 
 const roleNames = {
@@ -14,27 +17,6 @@ const roleNames = {
     editor: "Edit",
     reader: "Read only"
 } as const
-const auditNames: Record<string, string> = {
-    "user.joined": "User joined",
-    "vault.created": "Vault created",
-    "vault.renamed": "Vault renamed",
-    "vault.deleted": "Vault deleted",
-    "item.created": "Item created",
-    "item.updated": "Item updated",
-    "item.deleted": "Item deleted",
-    "item.password_copy_requested": "Password copy requested",
-    "item.username_copy_requested": "Username copy requested",
-    "item.notes_copy_requested": "Note copy requested",
-    "vault.exported": "Vault export requested",
-    "member.granted": "Access granted or updated",
-    "member.removed": "Access removed",
-    "sessions.revoked": "Sessions closed",
-    "user.disabled": "User disabled",
-    "user.enabled": "User enabled",
-    "vault.recovered": "Administrator recovered access",
-    "vault.imported": "Local vault imported",
-    "keys.rotated": "Vault key protection updated"
-}
 const Icon = ({ name }: { name: string }) => <i className={`ti ti-${name}`} aria-hidden="true" />
 
 export default function CompanyWorkspace({ controller: c }: { controller: CompanyController }) {
@@ -66,31 +48,6 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                 )
             )
             .toSorted((first, second) => Number(Boolean(second.pinned)) - Number(Boolean(first.pinned))) ?? []
-    const table = (entries: AuditEntry[]) => (
-        <div className="cw-table-wrap" role="region" aria-label={t("Activity")} tabIndex={0}>
-            <table className="cw-table cw-audit-table">
-                <caption className="sr-only">{t("Activity")}</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">{t("Date")}</th>
-                        <th scope="col">{t("Action")}</th>
-                        <th scope="col">{t("User")}</th>
-                        <th scope="col">{t("Affected item")}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {entries.map((entry) => (
-                        <tr key={entry.id}>
-                            <td>{new Date(entry.createdAt).toLocaleString(c.language)}</td>
-                            <td>{t(auditNames[entry.action] ?? entry.action)}</td>
-                            <td>{entry.actor}</td>
-                            <td>{entry.target}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    )
     const sidebar = (
         <aside className="cw-sidebar">
             <div className="cw-brand">
@@ -155,6 +112,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                     <Icon name="archive" />
                     <span>{t("Import and export")}</span>
                 </button>
+                <InstallApp />
                 <div className="cw-language">
                     <span className="cw-language-label">
                         <Icon name="world" />
@@ -419,7 +377,8 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                             </section>
                             <section className="cw-admin-section">
                                 <h2>{t("Activity")}</h2>
-                                {c.adminData && table(c.adminData.audit)}
+                                <AuditIntegrity />
+                                <ActivityFeed />
                             </section>
                         </>
                     ) : !c.activeId ? (
@@ -575,13 +534,7 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                                                 <button
                                                     onClick={(event) => {
                                                         event.currentTarget.closest("details")?.removeAttribute("open")
-                                                        void c.perform(async () =>
-                                                            c.setAudit(
-                                                                await companyApi<AuditEntry[]>(
-                                                                    `/vaults/${c.activeId}/audit`
-                                                                )
-                                                            )
-                                                        )
+                                                        void c.perform(async () => c.setAudit([]))
                                                     }}
                                                 >
                                                     <Icon name="history" />
@@ -1130,16 +1083,13 @@ export default function CompanyWorkspace({ controller: c }: { controller: Compan
                 <CompanyDialog
                     returnFocus={invoker.current}
                     title={t("Activity")}
+                    autoFocusField={false}
                     wide
                     onClose={() => c.setAudit(null)}
                 >
                     <div className="cw-dialog-body">
-                        <p className="cw-dialog-description">
-                            {t(
-                                "Shows the latest 200 events. Copy events record requests from this app; the browser may block the clipboard. Actions outside this app cannot be tracked."
-                            )}
-                        </p>
-                        {table(c.audit)}
+                        <AuditIntegrity vaultId={c.activeId} />
+                        <ActivityFeed vaultId={c.activeId} />
                     </div>
                 </CompanyDialog>
             )}

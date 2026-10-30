@@ -2,6 +2,54 @@ import type { APIContext } from "astro"
 import { readAuthSettings } from "./auth"
 import { CompanyError, getCompanyStore } from "./company-store"
 import { readCompanySession } from "./company-session"
+import { AuditLedger } from "./audit-ledger"
+import { submitAuditDigest, upgradeAuditProof, verifyAuditProof } from "./audit-ots"
+
+async function auditRequest(
+    store: ReturnType<typeof getCompanyStore>,
+    actor: NonNullable<APIContext["locals"]["companyUser"]>,
+    method: string,
+    path: string[],
+    vaultId?: string
+) {
+    const ledger = new AuditLedger(store)
+    if (!path.length && method === "GET") return ledger.list(actor, vaultId)
+    if (!path.length && method === "POST") {
+        const seal = ledger.prepare(actor, vaultId)
+        if (!seal.proof) {
+            ledger.attempt(actor, seal.id, vaultId)
+            let proof: string
+            try {
+                proof = await submitAuditDigest(seal.digest)
+            } catch {
+                throw new CompanyError(
+                    503,
+                    "Timestamp calendars are unavailable. Your local seal was preserved; retry later."
+                )
+            }
+            ledger.saveProof(actor, seal.id, proof, vaultId)
+        }
+        return ledger.list(actor, vaultId)
+    }
+    if (path.length === 2 && path[1] === "download" && method === "GET") return ledger.download(actor, path[0], vaultId)
+    if (path.length === 2 && path[1] === "verify" && method === "POST") {
+        const seal = ledger.attempt(actor, path[0], vaultId)
+        if (!seal.proof) throw new CompanyError(400, "Submit this seal before verifying it.")
+        let proof: string, confirmation: Awaited<ReturnType<typeof verifyAuditProof>>
+        try {
+            proof = await upgradeAuditProof(seal.proof, seal.digest)
+            confirmation = await verifyAuditProof(proof, seal.digest)
+        } catch {
+            throw new CompanyError(
+                503,
+                "Bitcoin verification could not be completed. No new confirmation was recorded."
+            )
+        }
+        ledger.saveProof(actor, seal.id, proof, vaultId, confirmation)
+        return ledger.list(actor, vaultId)
+    }
+    throw new CompanyError(404, "Not found.")
+}
 
 async function jsonBody(request: Request) {
     if (request.headers.get("content-type")?.split(";")[0].trim() !== "application/json")
@@ -85,10 +133,17 @@ export async function companyHandler(context: APIContext): Promise<Response> {
             else if (parts[2] === "members" && parts.length === 4 && method === "DELETE") {
                 store.removeMember(actor, id, parts[3])
                 result = { ok: true }
-            } else if (parts[2] === "audit" && parts.length === 3 && method === "GET")
-                result = store.getAudit(actor, id)
+            } else if (parts[2] === "audit" && parts[3] === "events" && parts.length === 4 && method === "GET")
+                result = store.getAuditPage(actor, context.url.searchParams, id)
+            else if (parts[2] === "audit" && parts[3] === "seals")
+                result = await auditRequest(store, actor, method, parts.slice(4), id)
+            else if (parts[2] === "audit" && parts.length === 3 && method === "GET") result = store.getAudit(actor, id)
             else throw new CompanyError(404, "Not found.")
-        } else if (parts.join("/") === "export" && method === "POST") result = store.exportData(actor, body.vaultIds)
+        } else if (parts.join("/") === "admin/audit/events" && method === "GET")
+            result = store.getAuditPage(actor, context.url.searchParams)
+        else if (parts[0] === "admin" && parts[1] === "audit" && parts[2] === "seals")
+            result = await auditRequest(store, actor, method, parts.slice(3))
+        else if (parts.join("/") === "export" && method === "POST") result = store.exportData(actor, body.vaultIds)
         else if (parts.join("/") === "import" && method === "POST") result = store.importLocal(actor, body)
         else if (parts.join("/") === "me/revoke-sessions" && method === "POST") {
             store.revokeSessions(actor)

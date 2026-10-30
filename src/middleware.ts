@@ -1,32 +1,67 @@
 import { defineMiddleware } from "astro:middleware"
+import type { APIContext, MiddlewareNext } from "astro"
 import { readAuthSettings, type AuthSettings } from "./server/auth"
 import { readCompanySession } from "./server/company-session"
 import { getCompanyStore } from "./server/company-store"
+import { ensureAuditWorker } from "./server/audit-worker"
 
-const unavailable = () => new Response("Authentication is not configured. Contact the administrator.", {
-    status: 503, headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" }
-})
+const unavailable = () =>
+    new Response("Authentication is not configured. Contact the administrator.", {
+        status: 503,
+        headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" }
+    })
 
-export const onRequest = defineMiddleware(async (context, next) => {
+const handleRequest = async (context: APIContext, next: MiddlewareNext): Promise<Response> => {
     const path = context.url.pathname
+    if (["/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml"].includes(path))
+        return new Response(null, { status: 410 })
+    if (["/robots.txt", "/manifest.webmanifest", "/sw.js"].includes(path) || path.startsWith("/icons/")) return next()
     // Static assets contain no user data and must remain available on the login page.
-    if (path.startsWith("/_astro/") || path.startsWith("/libs/") || path.startsWith("/images/") || path.startsWith("/fonts/") || path === "/favicon.svg") return next()
+    if (
+        path.startsWith("/_astro/") ||
+        path.startsWith("/libs/") ||
+        path.startsWith("/images/") ||
+        path.startsWith("/fonts/") ||
+        path === "/favicon.svg"
+    )
+        return next()
     let settings: AuthSettings
-    try { settings = readAuthSettings() } catch { return unavailable() }
+    try {
+        settings = readAuthSettings()
+    } catch {
+        return unavailable()
+    }
     context.locals.corporateUser = null
     context.locals.companyUser = null
     if (settings.mode === "local") return next()
-    try { getCompanyStore() } catch { return unavailable() }
+    try {
+        getCompanyStore()
+        ensureAuditWorker()
+    } catch {
+        return unavailable()
+    }
     if (path === "/login" || path.startsWith("/api/auth/") || path === "/api/health") return next()
     let authentication: Awaited<ReturnType<typeof readCompanySession>>
-    try { authentication = await readCompanySession(context.request, settings) } catch { return unavailable() }
+    try {
+        authentication = await readCompanySession(context.request, settings)
+    } catch {
+        return unavailable()
+    }
     const { user, cookies } = authentication
     context.locals.corporateUser = user
     context.locals.companyUser = user
-    const response = user ? await next() : path.startsWith("/api/")
-        ? Response.json({ error: "Unauthorized" }, { status: 401 })
-        : context.redirect("/login", 303)
+    const response = user
+        ? await next()
+        : path.startsWith("/api/")
+          ? Response.json({ error: "Unauthorized" }, { status: 401 })
+          : context.redirect("/login", 303)
     for (const cookie of cookies) response.headers.append("Set-Cookie", cookie)
     response.headers.set("Cache-Control", "no-store")
+    return response
+}
+
+export const onRequest = defineMiddleware(async (context, next) => {
+    const response = await handleRequest(context, next)
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex")
     return response
 })

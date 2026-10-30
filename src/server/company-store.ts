@@ -80,7 +80,7 @@ export class CompanyStore {
         this.db = new DatabaseSync(settings.path)
         try {
             const schemaVersion = (this.db.prepare("PRAGMA user_version").get() as Row).user_version
-            if (schemaVersion > 2) throw new Error("Unsupported company database version")
+            if (schemaVersion > 3) throw new Error("Unsupported company database version")
             if (process.platform !== "win32") chmodSync(settings.path, 0o600)
             this.db.exec(`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
                 CREATE TABLE IF NOT EXISTS company_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -108,11 +108,16 @@ export class CompanyStore {
                 CREATE TABLE IF NOT EXISTS company_imports (
                     user_id TEXT NOT NULL REFERENCES company_users(id), source_id TEXT NOT NULL,
                     result TEXT NOT NULL, PRIMARY KEY(user_id, source_id));
+                CREATE TABLE IF NOT EXISTS company_audit_seals (
+                    id TEXT PRIMARY KEY, scope TEXT NOT NULL, manifest TEXT NOT NULL, digest TEXT NOT NULL,
+                    first_id INTEGER NOT NULL,last_id INTEGER NOT NULL,created_at INTEGER NOT NULL,
+                    proof TEXT,submitted_at INTEGER,checked_at INTEGER,block_height INTEGER,block_hash TEXT,block_time INTEGER,
+                    attempted_at INTEGER NOT NULL DEFAULT 0, UNIQUE(scope,last_id));
                 CREATE INDEX IF NOT EXISTS company_member_users ON company_members(user_id);
                 CREATE INDEX IF NOT EXISTS company_pending_emails ON company_members(invited_email) WHERE user_id IS NULL;
                 CREATE INDEX IF NOT EXISTS company_item_vaults ON company_items(vault_id);
                 CREATE INDEX IF NOT EXISTS company_audit_vaults ON company_audit(vault_id, id);`)
-            this.db.exec("PRAGMA user_version=2")
+            this.db.exec("PRAGMA user_version=3")
             for (const row of this.all("SELECT id,wrapped_key FROM company_vaults"))
                 unwrapKey(row.wrapped_key, row.id, settings.keys)
         } catch (error) {
@@ -476,16 +481,70 @@ export class CompanyStore {
     }
     getAudit(actor: CompanyUser, vaultId: string) {
         this.member(actor, vaultId, ["owner", "admin"])
-        return this.auditRows("WHERE vault_id=?", vaultId)
+        return this.auditRows("WHERE vault_id=?", [vaultId])
     }
-    private auditRows(where = "", ...params: string[]) {
+    authorizeAudit(actor: CompanyUser, vaultId?: string) {
+        if (vaultId) this.member(actor, vaultId, ["owner", "admin"])
+        else this.admin(actor)
+    }
+    getAuditPage(actor: CompanyUser, input: URLSearchParams, vaultId?: string) {
+        this.authorizeAudit(actor, vaultId)
+        const pageText = input.get("page") ?? "1",
+            page = Number(pageText)
+        const snapshotText = input.get("asOf"),
+            requestedSnapshot = snapshotText === null ? null : Number(snapshotText)
+        const query = input.get("q")?.trim() ?? "",
+            action = input.get("action") ?? ""
+        if (
+            !/^\d+$/.test(pageText) ||
+            !Number.isSafeInteger(page) ||
+            page < 1 ||
+            (snapshotText !== null &&
+                (!/^\d+$/.test(snapshotText) ||
+                    !Number.isSafeInteger(requestedSnapshot) ||
+                    Number(requestedSnapshot) < 0)) ||
+            query.length > 200 ||
+            action.length > 80
+        )
+            throw new CompanyError(400, "Invalid activity filter.")
+        const filters: string[] = [],
+            values: (string | number)[] = []
+        if (vaultId) {
+            filters.push("a.vault_id=?")
+            values.push(vaultId)
+        }
+        const newest = this.one(
+            `SELECT coalesce(max(a.id),0) id FROM company_audit a ${vaultId ? "WHERE a.vault_id=?" : ""}`,
+            ...(vaultId ? [vaultId] : [])
+        )!.id
+        const asOf = requestedSnapshot === null ? newest : Math.min(newest, requestedSnapshot)
+        filters.push("a.id<=?")
+        values.push(asOf)
+        if (query) {
+            filters.push("instr(lower(a.actor_email || ' ' || a.target),lower(?))>0")
+            values.push(query)
+        }
+        if (action) {
+            filters.push("a.action=?")
+            values.push(action)
+        }
+        const where = filters.length ? `WHERE ${filters.join(" AND ")}` : ""
+        const total = this.one(`SELECT count(*) total FROM company_audit a ${where}`, ...values)!.total
+        const pages = Math.max(1, Math.ceil(total / 100))
+        if (page > pages) throw new CompanyError(400, "Invalid activity filter.")
+        const entries = this.auditRows(where, values, 100, (page - 1) * 100)
+        return { entries, total, page, pages, asOf }
+    }
+    private auditRows(where = "", params: (string | number)[] = [], limit = 200, offset = 0) {
         return this.all(
             `SELECT a.id,a.action,a.actor_email AS actor,
             CASE WHEN a.action IN ('vault.created','vault.renamed','vault.imported','vault.recovered') AND a.target=a.vault_id
             THEN coalesce((SELECT v.name FROM company_vaults v WHERE v.id=a.vault_id),a.target)
             ELSE a.target END AS target,a.created_at AS createdAt
-            FROM company_audit a ${where} ORDER BY a.id DESC LIMIT 200`,
-            ...params
+            FROM company_audit a ${where} ORDER BY a.id DESC LIMIT ? OFFSET ?`,
+            ...params,
+            limit,
+            offset
         )
     }
     private admin(actor: CompanyUser) {
