@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { CompanyStore, CompanyError, readCompanySettings } from '../src/server/company-store.ts'
 import { parseAccessPolicy } from '../src/server/access-policy.ts'
+import { AuditLedger } from '../src/server/audit-ledger.ts'
 
 const policy = parseAccessPolicy('latamware.test', 'alice@gmail.com,bob@gmail.com')
 const content = (password = 'synthetic-password-only-123!') => ({ kind: 'password', title: 'Hosting', username: 'synthetic-user', password, url: 'https://example.test', notes: 'synthetic private note' })
@@ -138,6 +139,31 @@ test('vault activity preserves names and resolves historical UUID targets for bo
     const current = store.getVault(admin, vault.id)
     store.deleteVault(admin, vault.id, current.version)
     assert.equal(store.adminData(admin).audit.find(entry => entry.action === 'vault.deleted' && entry.target === 'Renamed vault').target, 'Renamed vault')
+})
+
+test('historical item UUIDs display scoped titles without rewriting sealed events or exposing credential values', t => {
+    const {store,admin,alice}=fixture(t)
+    const vault=store.createVault(admin,'Names fixture'),other=store.createVault(admin,'Other scope')
+    const item=store.saveItem(admin,vault.id,content())
+    const event=store.getAudit(admin,vault.id).find(entry=>entry.action==='item.created')
+    store.db.prepare('UPDATE company_audit SET target=? WHERE id=?').run(item.id,event.id)
+    const ledger=new AuditLedger(store);ledger.prepare(admin,vault.id)
+    const displays=[store.getAudit(admin,vault.id),store.getAuditPage(admin,new URLSearchParams(),vault.id).entries,store.adminData(admin).audit]
+    for(const rows of displays){
+        assert.equal(rows.find(row=>row.id===event.id).target,'Hosting')
+        assert.equal(JSON.stringify(rows).includes(content().password),false)
+        assert.equal(JSON.stringify(rows).includes(content().username),false)
+    }
+    assert.equal(store.db.prepare('SELECT target FROM company_audit WHERE id=?').get(event.id).target,item.id)
+    assert.equal(ledger.list(admin,vault.id).integrity,'intact')
+    store.db.prepare('INSERT INTO company_audit(vault_id,actor_id,actor_email,action,target,created_at) VALUES(?,?,?,?,?,?)').run(other.id,admin.id,admin.email,'item.created',item.id,Date.now())
+    assert.equal(store.getAudit(admin,other.id).find(row=>row.action==='item.created').targetUnavailable,true,'a foreign vault ID never resolves a title')
+    denied(()=>store.getAudit(alice,vault.id),404)
+    store.deleteItem(admin,vault.id,item.id,item.version)
+    const deleted=store.getAudit(admin,vault.id).find(row=>row.id===event.id)
+    assert.equal(deleted.target,'Item name unavailable')
+    assert.equal(deleted.targetUnavailable,true)
+    assert.equal(ledger.list(admin,vault.id).integrity,'intact')
 })
 
 test('Google users get central encrypted vaults, pending invitations and server-enforced roles', t => {

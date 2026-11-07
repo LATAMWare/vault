@@ -1656,6 +1656,24 @@
     flex-wrap: wrap;
     margin-top: 16px;
 }
+.cw-integrity-result {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 12px;
+    border: 1px solid #93bba933;
+    border-radius: 9px;
+    background: #93bba90a;
+    color: #b7d8c8;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.cw-integrity-result i {
+    flex: none;
+    margin-top: 2px;
+    font-size: 17px;
+}
 .cw-action-dropdown {
     position: relative;
 }

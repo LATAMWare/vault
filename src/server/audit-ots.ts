@@ -18,6 +18,11 @@ const HEADER = Buffer.from("004f70656e54696d657374616d7073000050726f6f6600bf89e2
 const sha = (value: Uint8Array) => createHash("sha256").update(value).digest()
 type Fetcher = typeof fetch
 type Point = { tree: Tree; leaf: Leaf; message: Buffer }
+class TimestampServiceError extends Error {
+    constructor(readonly status: number) {
+        super("Timestamp service unavailable")
+    }
+}
 
 async function request(url: string, options: RequestInit = {}, fetcher: Fetcher = fetch): Promise<Buffer> {
     const response = await fetcher(url, {
@@ -26,7 +31,7 @@ async function request(url: string, options: RequestInit = {}, fetcher: Fetcher 
         signal: AbortSignal.timeout(7000),
         headers: { Accept: "application/vnd.opentimestamps.v1", ...options.headers }
     })
-    if (!response.ok) throw new Error("Timestamp service unavailable")
+    if (!response.ok) throw new TimestampServiceError(response.status)
     const reader = response.body?.getReader()
     if (!reader) throw new Error("Invalid timestamp response")
     const chunks: Uint8Array[] = []
@@ -91,8 +96,12 @@ export function readAuditProof(proof: string, digest: string) {
     points(timestamp)
     return timestamp
 }
-function calendarTree(body: Buffer, message: Buffer) {
-    return read(new Uint8Array(Buffer.concat([HEADER, message, body]))).tree
+function calendarTree(body: Buffer) {
+    // Calendar responses contain only a tree, not a detached file hash. Supply a
+    // fixed-size placeholder to the detached-file codec; intermediate commitments
+    // have variable lengths after appending/hash operations. Proof operations
+    // still use the actual message rather than this parsing placeholder.
+    return read(new Uint8Array(Buffer.concat([HEADER, Buffer.alloc(32), body]))).tree
 }
 function allowedCalendar(url: URL): string | undefined {
     if (url.username || url.password || url.search || url.hash || !["", "/"].includes(url.pathname)) return
@@ -113,7 +122,7 @@ export async function submitAuditDigest(digest: string, fetcher: Fetcher = fetch
                 },
                 fetcher
             )
-            const tree = calendarTree(body, commitment)
+            const tree = calendarTree(body)
             const attestations = points({ version: 1, fileHash: { algorithm: "sha256", value: commitment }, tree })
             if (
                 !attestations.some(
@@ -148,25 +157,32 @@ export async function submitAuditDigest(digest: string, fetcher: Fetcher = fetch
 }
 export async function upgradeAuditProof(proof: string, digest: string, fetcher: Fetcher = fetch): Promise<string> {
     const timestamp = readAuditProof(proof, digest)
-    const pending = points(timestamp)
+    const attestations = points(timestamp)
+    const pending = attestations
         .filter((point) => point.leaf.type === "pending" && allowedCalendar(point.leaf.url))
         .slice(0, 4)
+    let reachable = 0
     await Promise.all(
         pending.map(async (point) => {
             if (point.leaf.type !== "pending") return
             try {
                 const calendar = allowedCalendar(point.leaf.url)!
                 const body = await request(`${calendar}/timestamp/${point.message.toString("hex")}`, {}, fetcher)
-                const tree = calendarTree(body, point.message)
+                const tree = calendarTree(body)
                 points({ version: 1, fileHash: { algorithm: "sha256", value: point.message }, tree })
                 point.tree.leaves.remove(point.leaf)
                 point.tree.leaves.incorporate(tree.leaves)
                 point.tree.edges.incorporate(tree.edges)
-            } catch {
-                /* Preserve the pending receipt while its calendar is unavailable or not yet ready. */
+                reachable++
+            } catch (error) {
+                // Calendars return 404 until an attestation is available. Outages
+                // and malformed replies must not masquerade as a successful check.
+                if (error instanceof TimestampServiceError && error.status === 404) reachable++
             }
         })
     )
+    if (pending.length && !reachable && !attestations.some((point) => point.leaf.type === "bitcoin"))
+        throw new Error("Timestamp calendars are unavailable")
     const upgraded = Buffer.from(write(timestamp)).toString("base64")
     readAuditProof(upgraded, digest)
     return upgraded

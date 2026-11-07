@@ -23,6 +23,10 @@ const defaults = { kind: 'password', username: 'admin@empresa.test', password: '
 for (const title of ['Google Workspace', 'Panel de hosting', 'Servidor de producción']) store.saveItem(admin, infra.id, { ...defaults, title })
 store.saveItem(admin, infra.id, { ...defaults, kind: 'note', title: 'Procedimiento de acceso', notes: 'Nota de demostración para el equipo.' })
 store.saveItem(admin, clients.id, { ...defaults, title: 'Portal de clientes' })
+// Pre-upgrade records stored only item IDs. Exercise display-name resolution
+// without using or changing any real company activity.
+const legacyItem = store.getVault(admin, infra.id).items.find(item => item.title === 'Google Workspace')
+store.db.prepare("UPDATE company_audit SET target=? WHERE vault_id=? AND action='item.created' AND target='Google Workspace'").run(legacyItem.id, infra.id)
 store.share(admin, infra.id, reader.email, 'reader', parseAccessPolicy('latamware.test', ''))
 store.share(admin, clients.id, reader.email, 'editor', parseAccessPolicy('latamware.test', ''))
 // Synthetic historical events exercise pagination without using real company activity.

@@ -150,7 +150,7 @@ export default function ActivityFeed({ vaultId }: { vaultId?: string }) {
                                 <td>{new Date(entry.createdAt).toLocaleString(language)}</td>
                                 <td>{t(auditNames[entry.action] ?? entry.action)}</td>
                                 <td>{entry.actor}</td>
-                                <td>{entry.target}</td>
+                                <td>{entry.targetUnavailable ? t(entry.target) : entry.target}</td>
                             </tr>
                         ))}
                     </tbody>

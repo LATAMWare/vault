@@ -126,3 +126,28 @@ test('untrusted calendar URLs and redirects cannot select arbitrary network targ
     await upgradeAuditProof(unknown,digest,async()=>{requests++;throw new Error('must not fetch')})
     assert.equal(requests,0)
 })
+
+test('real calendar receipts with 44-byte intermediate commitments upgrade and verify against both Bitcoin providers',async()=>{
+    const initial=JSON.parse(readFileSync(new URL('./fixtures/ots/live-pending.json',import.meta.url)))
+    const fixture=JSON.parse(readFileSync(new URL('./fixtures/ots/calendar-upgrade.json',import.meta.url)))
+    const fetcher=async url=>{
+        const saved=fixture.responses.find(response=>response.url===url)
+        assert.ok(saved,`unexpected external request: ${url}`)
+        if(url.includes('/timestamp/'))assert.equal(url.split('/').at(-1).length,88,'calendar commitment is 44 bytes')
+        return new Response(Buffer.from(saved.body,'base64'),{status:saved.status})
+    }
+    const upgraded=await upgradeAuditProof(initial.proof,initial.digest,fetcher)
+    assert.notEqual(upgraded,initial.proof)
+    const confirmation=await verifyAuditProof(upgraded,initial.digest,fetcher)
+    assert.equal(confirmation.height,fixture.confirmation.height)
+    assert.equal(confirmation.hash,fixture.confirmation.hash)
+})
+
+test('calendar outages and malformed upgrade replies are errors, while an explicit not-ready response remains pending',async()=>{
+    const digest=hash('Synthetic outage test'),proof=pending(digest)
+    await assert.rejects(upgradeAuditProof(proof,digest,async()=>{throw new Error('offline')}))
+    await assert.rejects(upgradeAuditProof(proof,digest,async()=>new Response('',{status:503})))
+    await assert.rejects(upgradeAuditProof(proof,digest,async()=>new Response('not an OTS tree')))
+    assert.equal(await upgradeAuditProof(proof,digest,async()=>new Response('',{status:404})),proof)
+    assert.equal(readAuditProof(proof,digest).fileHash.algorithm,'sha256','original receipt remains usable')
+})

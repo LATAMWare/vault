@@ -40,5 +40,6 @@ export interface AuditEntry {
     action: string
     actor: string
     target: string
+    targetUnavailable?: boolean
     createdAt: number
 }

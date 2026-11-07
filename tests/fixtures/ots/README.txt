@@ -9,3 +9,8 @@ Blockstream's public Esplora API. Tests replay this response without network acc
 
 live-pending.json: genuine receipt from the public Alice/Bob calendars for a
 synthetic test message hash. Contains only digest/proof bytes, no company events.
+
+calendar-upgrade.json: public Alice/Bob upgrade responses for live-pending.json
+and matching Blockstream/mempool.space header responses for Bitcoin block 973889.
+The intermediate calendar commitments are 44 bytes after append operations, not 32 bytes.
+Captured to regress the detached-file codec wrapper without relying on live APIs.

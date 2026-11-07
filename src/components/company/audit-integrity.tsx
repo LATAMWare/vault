@@ -11,7 +11,9 @@ export default function AuditIntegrity({ vaultId }: { vaultId?: string }) {
     const { t } = useI18n()
     const [data, setData] = useState<Overview | null>(null),
         [busy, setBusy] = useState(false),
-        [error, setError] = useState("")
+        [error, setError] = useState(""),
+        [verifying, setVerifying] = useState(false),
+        [result, setResult] = useState<"pending" | "confirmed" | null>(null)
     const working = useRef(false),
         request = useRef<AbortController | null>(null)
     const path = vaultId ? `/vaults/${encodeURIComponent(vaultId)}/audit/seals` : "/admin/audit/seals"
@@ -41,6 +43,7 @@ export default function AuditIntegrity({ vaultId }: { vaultId?: string }) {
         }
         setData(null)
         setError("")
+        setResult(null)
         load()
         const timer = setInterval(load, 30000)
         window.addEventListener("focus", load)
@@ -51,12 +54,14 @@ export default function AuditIntegrity({ vaultId }: { vaultId?: string }) {
             window.removeEventListener("focus", load)
         }
     }, [path])
-    const run = async (action: () => Promise<void>) => {
+    const run = async (action: () => Promise<void>, verification = false) => {
         if (working.current) return
         working.current = true
         request.current?.abort()
         setBusy(true)
+        setVerifying(verification)
         setError("")
+        setResult(null)
         try {
             await action()
         } catch (reason) {
@@ -64,10 +69,24 @@ export default function AuditIntegrity({ vaultId }: { vaultId?: string }) {
         } finally {
             working.current = false
             setBusy(false)
+            setVerifying(false)
         }
     }
     const batch = data?.batches[0]
     const changed = data?.integrity === "changed"
+    const verify = () =>
+        run(async () => {
+            if (!batch) return
+            const value = await companyApi<Overview>(`${path}/${batch.id}/verify`, "POST")
+            setData(value)
+            if (value.integrity !== "intact") {
+                setError("The sealed activity has changed. Investigate before creating another seal.")
+                return
+            }
+            setResult(
+                value.batches.find((entry) => entry.id === batch.id)?.state === "confirmed" ? "confirmed" : "pending"
+            )
+        }, true)
     const seal = () =>
         run(async () => {
             try {
@@ -122,13 +141,9 @@ export default function AuditIntegrity({ vaultId }: { vaultId?: string }) {
                 <button
                     className="cw-button"
                     disabled={busy || !batch || batch.state === "unsubmitted" || changed}
-                    onClick={() =>
-                        void run(async () => {
-                            if (batch) setData(await companyApi<Overview>(`${path}/${batch.id}/verify`, "POST"))
-                        })
-                    }
+                    onClick={() => void verify()}
                 >
-                    {t("Verify integrity")}
+                    {t(verifying ? "Verifying integrity..." : "Verify integrity")}
                 </button>
                 <button
                     className="cw-button"
@@ -160,6 +175,16 @@ export default function AuditIntegrity({ vaultId }: { vaultId?: string }) {
                     </button>
                 )}
             </div>
+            {result && (
+                <p className="cw-integrity-result" role="status">
+                    <i className="ti ti-circle-check" aria-hidden="true" />
+                    {t(
+                        result === "confirmed"
+                            ? "Activity integrity verified. The seal is confirmed on Bitcoin."
+                            : "Activity integrity verified. Bitcoin confirmation is still pending."
+                    )}
+                </p>
+            )}
         </section>
     )
 }

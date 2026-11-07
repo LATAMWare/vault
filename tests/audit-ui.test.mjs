@@ -57,5 +57,26 @@ test('seal panel exposes exactly four controls, accessible pending text and an e
         await React.act(async()=>verify.click())
         assert.equal(host.querySelector('a').href,`https://mempool.space/block/${block}`)
         assert.equal(host.querySelector('a').rel,'noopener noreferrer')
+        assert.ok(host.querySelector('.cw-integrity-result').textContent.includes('El sello está confirmado en Bitcoin.'))
+    })
+})
+
+test('verifying visibly reports progress, a successful local check with pending Bitcoin, and provider errors',async()=>{
+    let finish
+    const overview={integrity:'intact',unsealedCount:0,batches:[{id:'fixture-seal',integrity:'intact',state:'pending',blockHash:null}]}
+    await mounted(AuditIntegrity,async(_path,options)=>options.method==='POST'?new Promise(resolve=>{finish=resolve}):Response.json(overview),async host=>{
+        const verify=[...host.querySelectorAll('button')].find(button=>button.textContent==='Verificar integridad')
+        await React.act(async()=>verify.click())
+        assert.equal(verify.textContent,'Verificando integridad...')
+        assert.equal(verify.disabled,true)
+        await React.act(async()=>finish(Response.json(overview)))
+        assert.ok(host.querySelector('.cw-integrity-result').textContent.includes('La actividad está intacta.'))
+        assert.ok(host.querySelector('.cw-integrity-result').textContent.includes('sigue pendiente'))
+        await React.act(async()=>verify.click())
+        assert.equal(host.querySelector('.cw-integrity-result'),null,'a previous success cannot mask a failed recheck')
+        await React.act(async()=>finish(Response.json({error:'Bitcoin verification could not be completed. No new confirmation was recorded.'},{status:503})))
+        assert.ok(host.querySelector('[role=alert]').textContent.length>0)
+        assert.equal(host.querySelector('.cw-integrity-result'),null)
+        assert.equal(verify.disabled,false)
     })
 })

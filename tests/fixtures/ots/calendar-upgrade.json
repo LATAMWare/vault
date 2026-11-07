@@ -1,0 +1,51 @@
+{
+  "source": "Public Alice/Bob calendar responses for live-pending.json, plus public Bitcoin API responses. No company data.",
+  "confirmation": {
+    "hash": "00000000000000000001870c87c7a8403bc49127435484201790d846acdf2353",
+    "height": 973889,
+    "time": 1793399281000,
+    "confirmations": 1054
+  },
+  "responses": [
+    {
+      "url": "https://alice.btc.calendar.opentimestamps.org/timestamp/6ae518079857b39d46e48897d6d5b682a6cae119e2e66d36d4b80cb95593d6f8c672f50230c80bc6e52eaa00",
+      "status": 200,
+      "body": "CPAgLf6aLRjMGxqDtTJpttBS8w4vkLgG6fHTo8FYpCyRQbkI8CCJIhSA4VNnU6pqqa77Nvt274NSvLfDdfn0p3iSJvIfbwjxIPzMbY/5ive3NFz8ErLD28OwQ75xsULowir2BQTfquuPCPEgrvvD0sVlhRB1KRGIkramZc6Nt6jos85LM+es8aCeAIYI8CC3V4F5yiLi3cPsRRG19cARLfL1UIxC7IXdKJtPRWp80QjwIDAvkWjfa6OCLXmVscjOL9fj/cwdctqMl2bAaz5keBLyCPAgfwzpV5owBQkxBFDYk2FlW7o6iL4RKDv6Wcf1YXhPY98I8CDelm7CG4KLPAY+r6ulX/fG0XOflCWyHB17sbYsR5yNvgjwIE5OF3U/stSu1S7isl+a8LyLuxPkDeFlSlqAxHS/O1NnCPFZAQAAAAHdPR3o4ZwxiNEArbvNQDT4sNzZ1/pvMCiWdLd1JeB5HQAAAAAA/v///wKoJQEAAAAAABYAFGWkXoA6u6zrw8e6qtK4G21P+No8AAAAAAAAAAAiaiDwBEDcDgAICPAgGrQRlEV6w1r4DpXXS076i6DIEkFw78nUB4B32Et89YMICPEgwzn1uImvE7HRkRPbINDxz6SzfJXEOIZfouoTu90rKusICPAgg6fVmXfZOwDb0Qi/l3W7JkYU86CZpnuwhi+NI8zEXhYICPEgZHwMUYiOj2awlQD9Zra52NrSK+HaG/rZ7ka8tLmcVIcICPEggRSj1SPGA1ZRYDsO6G6ZJUsnqhr427KQNcwMrMlIiLQICPAgJJdTaLmQV6XVnXO0m30iH5MRZmvaSLY023HQf0vrV00ICPEgZosqpL3KpML2UBCDDlTISdkMWs1/53w9Aww79JkyIRAICPEgjwDCJaqngYhBouWSeCUMJyb5mW3m1LROX5g7xf/vH9gICPEgpQobBOEHgNKO01VopjsWww1NM4sdRE8AZhThbgXQxgIICPEgylenyvsW8Yokh0ym64Kq2dNGXeLVNS+2ji4tqKFeLwUICPAg1FBdYhg4zVL2xheQVckBtDBIGxfoFjbyCoTFh5AaZsAICPAg13zLs2YssOdjsk0gJaZtAApY30yf+fR2TbMgJGGeg5EICPAgCz/8NoWAhwQGT+KWYNy1V5AqKZCFr76BBmvbjZfiID4ICAAFiJYNc9cZAQPBuDs="
+    },
+    {
+      "url": "https://bob.btc.calendar.opentimestamps.org/timestamp/6ae5180808089d84412cdf83c0825e42e472b06b6c73cc73c64686957a1a0a3d8872c246dd4defcd0edd1b6c",
+      "status": 200,
+      "body": "CPAg0/8HtcZKvpc7ICQC3l7BxCXN2Tx+PRSk0Wzz+5NHQGAI8CD8a+yU6lLiB3ckEKX0mofOFNT9v/maSi+PTZACETh44QjxIDY+O5C6dzFf+pPYtQbvhMEsv1GdiQE4RQXcxRjLZbuNCPEgzFIgWIrndVl33BHp1eK7RVSWqGalXfrDf8qjAcZ6nG4I8CD5TS3rlzwJsx2TbYL+oltZU8hvZYLvGkzD8R43COeymwjwIAvQGssT9V+gVE+c6NFY1F2XXroJNQsZwDyYIOu+8CklCPAgtvWnKYGNixHFH2GfQORwnPHGfyo6COGrRyIdMyQv5E4I8CBlQVT1Tc94RXAWiYkrGJQHY4aNaz6tYzmsB1a811wz8QjwIN/RdMX8WcdurYAh3uihCBjgabP2v4rwNL0T+PyxXGpVCPFZAQAAAAFLX2hhHMMxKxaFGdT8Jhg6AX+4hMxFvdOrEr6CvKKDcQAAAAAA/v///wLetAAAAAAAABYAFAjbkEaikfiowu1r2yHPCWmkuHPAAAAAAAAAAAAiaiDwBEDcDgAICPEgTeyuS8SVRPMJne3EYbw4Mqn+W/UoKkdlLPcBAcinOgwICPEgn0TcGoZSLqiUwE1NcjRPifHPS1L9HigE1Q74tPman6EICPAguWKXmfxsD1+iVVrEc9muSyW9PnrsnqzqhtSKiivL1eUICPAgGwP6x/SD3g/K1Xpyigg2QySVID89y5uKF8oQiffOnhcICPEggRSj1SPGA1ZRYDsO6G6ZJUsnqhr427KQNcwMrMlIiLQICPAgJJdTaLmQV6XVnXO0m30iH5MRZmvaSLY023HQf0vrV00ICPEgZosqpL3KpML2UBCDDlTISdkMWs1/53w9Aww79JkyIRAICPEgjwDCJaqngYhBouWSeCUMJyb5mW3m1LROX5g7xf/vH9gICPEgpQobBOEHgNKO01VopjsWww1NM4sdRE8AZhThbgXQxgIICPEgylenyvsW8Yokh0ym64Kq2dNGXeLVNS+2ji4tqKFeLwUICPAg1FBdYhg4zVL2xheQVckBtDBIGxfoFjbyCoTFh5AaZsAICPAg13zLs2YssOdjsk0gJaZtAApY30yf+fR2TbMgJGGeg5EICPAgCz/8NoWAhwQGT+KWYNy1V5AqKZCFr76BBmvbjZfiID4ICAAFiJYNc9cZAQPBuDs="
+    },
+    {
+      "url": "https://mempool.space/api/block-height/973889",
+      "status": 200,
+      "body": "MDAwMDAwMDAwMDAwMDAwMDAwMDE4NzBjODdjN2E4NDAzYmM0OTEyNzQzNTQ4NDIwMTc5MGQ4NDZhY2RmMjM1Mw=="
+    },
+    {
+      "url": "https://mempool.space/api/blocks/tip/height",
+      "status": 200,
+      "body": "OTc0OTQy"
+    },
+    {
+      "url": "https://blockstream.info/api/blocks/tip/height",
+      "status": 200,
+      "body": "OTc0OTQy"
+    },
+    {
+      "url": "https://blockstream.info/api/block-height/973889",
+      "status": 200,
+      "body": "MDAwMDAwMDAwMDAwMDAwMDAwMDE4NzBjODdjN2E4NDAzYmM0OTEyNzQzNTQ4NDIwMTc5MGQ4NDZhY2RmMjM1Mw=="
+    },
+    {
+      "url": "https://mempool.space/api/block/00000000000000000001870c87c7a8403bc49127435484201790d846acdf2353/header",
+      "status": 200,
+      "body": "MDAwMGNhMjJjNjU0NTU3OGZlMWVhNGMxYjNhYzc0NzA2MmFjMjE0OWEyNWRiYWU4OTIzMDAxMDAwMDAwMDAwMDAwMDAwMDAwYTE3YzE2ZDhhZTdkYTY4MDJkOTA2ZmE4ODk2OTU5NDNlNzQ2ZjMxZGZkZTFjYTA1MWQyYzQ0YTEwYjdiY2IzY2YxMTllNTZhYWNlNTAxMTcyNzMzZDEzZg=="
+    },
+    {
+      "url": "https://blockstream.info/api/block/00000000000000000001870c87c7a8403bc49127435484201790d846acdf2353/header",
+      "status": 200,
+      "body": "MDAwMGNhMjJjNjU0NTU3OGZlMWVhNGMxYjNhYzc0NzA2MmFjMjE0OWEyNWRiYWU4OTIzMDAxMDAwMDAwMDAwMDAwMDAwMDAwYTE3YzE2ZDhhZTdkYTY4MDJkOTA2ZmE4ODk2OTU5NDNlNzQ2ZjMxZGZkZTFjYTA1MWQyYzQ0YTEwYjdiY2IzY2YxMTllNTZhYWNlNTAxMTcyNzMzZDEzZg=="
+    }
+  ]
+}

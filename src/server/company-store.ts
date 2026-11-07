@@ -4,7 +4,7 @@ import { dirname, isAbsolute } from "node:path"
 import { randomBytes, randomUUID } from "node:crypto"
 import { decrypt, encrypt, unwrapKey, wrapKey } from "./company-crypto"
 import { parseAccessPolicy, type AccessPolicy } from "./access-policy"
-import type { CompanyUser, ItemContent, VaultRole, CompanyVault, CompanyItem } from "../interfaces/company"
+import type { CompanyUser, ItemContent, VaultRole, CompanyVault, CompanyItem, AuditEntry } from "../interfaces/company"
 
 export class CompanyError extends Error {
     constructor(
@@ -481,7 +481,7 @@ export class CompanyStore {
     }
     getAudit(actor: CompanyUser, vaultId: string) {
         this.member(actor, vaultId, ["owner", "admin"])
-        return this.auditRows("WHERE vault_id=?", [vaultId])
+        return this.auditRows("WHERE a.vault_id=?", [vaultId])
     }
     authorizeAudit(actor: CompanyUser, vaultId?: string) {
         if (vaultId) this.member(actor, vaultId, ["owner", "admin"])
@@ -535,9 +535,10 @@ export class CompanyStore {
         const entries = this.auditRows(where, values, 100, (page - 1) * 100)
         return { entries, total, page, pages, asOf }
     }
-    private auditRows(where = "", params: (string | number)[] = [], limit = 200, offset = 0) {
+    private auditRows(where = "", params: (string | number)[] = [], limit = 200, offset = 0): AuditEntry[] {
+        const labels = new Map<string, { target: string; targetUnavailable?: boolean }>()
         return this.all(
-            `SELECT a.id,a.action,a.actor_email AS actor,
+            `SELECT a.id,a.action,a.actor_email AS actor,a.vault_id AS vaultId,
             CASE WHEN a.action IN ('vault.created','vault.renamed','vault.imported','vault.recovered') AND a.target=a.vault_id
             THEN coalesce((SELECT v.name FROM company_vaults v WHERE v.id=a.vault_id),a.target)
             ELSE a.target END AS target,a.created_at AS createdAt
@@ -545,7 +546,46 @@ export class CompanyStore {
             ...params,
             limit,
             offset
-        )
+        ).map(({ vaultId, ...entry }) => {
+            if (["user.joined", "user.disabled", "user.enabled", "sessions.revoked"].includes(entry.action)) {
+                const user = this.one("SELECT email FROM company_users WHERE id=?", entry.target)
+                if (user) return { ...entry, target: user.email } as AuditEntry
+            }
+            if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(entry.target)) return entry as AuditEntry
+            const cacheKey = `${entry.action.startsWith("item.") ? "item" : "vault"}:${vaultId}:${entry.target}`
+            if (!labels.has(cacheKey)) {
+                if (entry.action.startsWith("item.")) {
+                    const item = this.one(
+                        `SELECT i.*,v.wrapped_key FROM company_items i JOIN company_vaults v ON v.id=i.vault_id
+                        WHERE i.id=? AND i.vault_id=?`,
+                        entry.target,
+                        vaultId
+                    )
+                    if (item) {
+                        try {
+                            const key = unwrapKey(item.wrapped_key, item.vault_id, this.settings.keys)
+                            const content = itemContent(
+                                JSON.parse(
+                                    decrypt(
+                                        key,
+                                        JSON.parse(item.payload),
+                                        `vault-item:${item.vault_id}:${item.id}:${item.version}`
+                                    )
+                                )
+                            )
+                            labels.set(cacheKey, { target: content.title })
+                        } catch {
+                            /* A damaged or unavailable item must not expose encrypted contents. */
+                        }
+                    }
+                    if (!labels.has(cacheKey))
+                        labels.set(cacheKey, { target: "Item name unavailable", targetUnavailable: true })
+                } else if (entry.action.startsWith("vault.")) {
+                    labels.set(cacheKey, { target: "Vault name unavailable", targetUnavailable: true })
+                }
+            }
+            return { ...entry, ...labels.get(cacheKey) } as AuditEntry
+        })
     }
     private admin(actor: CompanyUser) {
         if (!this.settings.admins.includes(actor.email))
